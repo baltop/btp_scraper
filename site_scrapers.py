@@ -51,57 +51,129 @@ class DCBScraper(BaseScraper):
         soup = BeautifulSoup(html_content, 'html.parser')
         announcements = []
         
-        # 공고 목록 찾기 - 보통 ul/li 구조
-        list_container = soup.find('ul', class_=re.compile('list|board'))
-        if not list_container:
-            return announcements
-            
-        items = list_container.find_all('li')
+        # DCB는 table 구조 사용
+        board_container = soup.find('div', class_='board-text')
+        if not board_container:
+            # 대체 방법: table 직접 찾기
+            table = soup.find('table', class_=re.compile('board|list'))
+            if table:
+                board_container = table
         
-        for item in items:
-            try:
-                # 제목 링크 찾기
-                link = item.find('a')
-                if not link:
+        if board_container:
+            # 모든 tr 태그 찾기
+            rows = board_container.find_all('tr')
+            
+            for row in rows:
+                try:
+                    tds = row.find_all('td')
+                    if len(tds) < 2:
+                        continue
+                    
+                    # 번호 셀 확인 (공지사항은 icon_notice.png)
+                    num_td = tds[0]
+                    num_text = num_td.get_text(strip=True)
+                    
+                    # 제목 셀에서 링크 찾기
+                    title_td = None
+                    for td in tds:
+                        if td.find('a'):
+                            title_td = td
+                            break
+                    
+                    if not title_td:
+                        continue
+                        
+                    link = title_td.find('a')
+                    if not link:
+                        continue
+                    
+                    title = link.get_text(strip=True)
+                    href = link.get('href', '')
+                    
+                    if href:
+                        # URL이 상대경로인 경우 절대경로로 변환
+                        if href.startswith('/'):
+                            detail_url = self.base_url + href
+                        else:
+                            detail_url = urljoin(self.base_url, href)
+                    else:
+                        continue
+                    
+                    # 날짜 찾기 (보통 마지막에서 두 번째 td)
+                    date = ''
+                    if len(tds) >= 4:
+                        date = tds[-2].get_text(strip=True)
+                    
+                    # 파일 첨부 여부 확인
+                    has_file = False
+                    if title_td.find('img', alt='파일'):
+                        has_file = True
+                    
+                    announcements.append({
+                        'num': num_text,
+                        'title': title,
+                        'url': detail_url,
+                        'date': date,
+                        'has_file': has_file
+                    })
+                    
+                except Exception as e:
                     continue
                     
-                title = link.get_text(strip=True)
-                href = link.get('href', '')
-                
-                if href:
-                    detail_url = urljoin(self.base_url, href)
-                else:
-                    continue
-                
-                # 날짜 찾기
-                date_elem = item.find(class_=re.compile('date|time'))
-                date = date_elem.get_text(strip=True) if date_elem else ''
-                
-                announcements.append({
-                    'title': title,
-                    'url': detail_url,
-                    'date': date
-                })
-                
-            except Exception as e:
-                continue
-                
         return announcements
         
     def parse_detail_page(self, html_content):
         soup = BeautifulSoup(html_content, 'html.parser')
         
-        # 본문 영역 찾기
-        content_area = soup.find('div', class_=re.compile('content|view'))
+        # 본문 영역 찾기 - DCB는 특정 구조 사용
+        content_area = None
+        
+        # 방법 1: board-view 클래스 찾기
+        content_area = soup.find('div', class_='board-view')
+        
+        # 방법 2: 본문이 있는 테이블 찾기
+        if not content_area:
+            tables = soup.find_all('table')
+            for table in tables:
+                # 본문은 보통 긴 텍스트가 있는 셀에 있음
+                tds = table.find_all('td')
+                for td in tds:
+                    text_length = len(td.get_text(strip=True))
+                    if text_length > 200:  # 본문으로 추정되는 긴 텍스트
+                        content_area = td
+                        break
+                if content_area:
+                    break
         
         # 첨부파일 찾기
         attachments = []
-        file_area = soup.find('div', class_=re.compile('file|attach'))
-        if file_area:
-            links = file_area.find_all('a')
-            for link in links:
+        
+        # 방법 1: 파일 다운로드 링크 패턴으로 찾기
+        file_patterns = [
+            r'/_Bbs/board/download\.php',
+            r'/download\.php',
+            r'act_download',
+            r'fileDown',
+            r'file_down'
+        ]
+        
+        for pattern in file_patterns:
+            file_links = soup.find_all('a', href=re.compile(pattern))
+            for link in file_links:
                 file_name = link.get_text(strip=True)
                 file_url = link.get('href', '')
+                
+                # 빈 파일명 처리
+                if not file_name or file_name.isspace():
+                    # href에서 파일명 추출 시도
+                    if 'filename=' in file_url:
+                        import urllib.parse
+                        parsed = urllib.parse.parse_qs(urllib.parse.urlparse(file_url).query)
+                        if 'filename' in parsed:
+                            file_name = parsed['filename'][0]
+                    else:
+                        file_name = "첨부파일"
+                
                 if file_url:
                     file_url = urljoin(self.base_url, file_url)
                     attachments.append({
@@ -109,10 +181,32 @@ class DCBScraper(BaseScraper):
                         'url': file_url
                     })
         
+        # 방법 2: 첨부파일 영역에서 찾기
+        file_areas = soup.find_all(['div', 'td'], class_=re.compile('file|attach|download'))
+        for area in file_areas:
+            links = area.find_all('a')
+            for link in links:
+                if link in [a for a in attachments]:  # 중복 제거
+                    continue
+                    
+                file_name = link.get_text(strip=True)
+                file_url = link.get('href', '')
+                
+                if file_url and file_name and not file_name.isspace():
+                    file_url = urljoin(self.base_url, file_url)
+                    attachments.append({
+                        'name': file_name,
+                        'url': file_url
+                    })
+        
+        # 본문을 마크다운으로 변환
         content_md = ""
         if content_area:
+            # 불필요한 스크립트나 스타일 태그 제거
+            for tag in content_area.find_all(['script', 'style']):
+                tag.decompose()
             content_md = self.h.handle(str(content_area))
-            
+        
         return {
             'content': content_md,
             'attachments': attachments

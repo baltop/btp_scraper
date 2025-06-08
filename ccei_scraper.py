@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 import json
 import re
+import os
 
 class CCEIScraper(BaseScraper):
     """충북창조경제혁신센터 전용 스크래퍼"""
@@ -13,6 +14,7 @@ class CCEIScraper(BaseScraper):
         self.base_url = "https://ccei.creativekorea.or.kr"
         self.list_url = "https://ccei.creativekorea.or.kr/chungbuk/custom/notice_list.do"
         self.api_url = "https://ccei.creativekorea.or.kr/chungbuk/custom/noticeList.json"
+        self.list_cache = {}  # 리스트 데이터 캐시
         
     def get_list_url(self, page_num):
         """페이지 번호에 따른 목록 URL 반환"""
@@ -76,6 +78,9 @@ class CCEIScraper(BaseScraper):
                 has_file = item.get('FILE', '') != ''
                 is_recommend = item.get('RECOMMEND_WHETHER', '') == 'Y'
                 
+                # 리스트 캐시에 저장
+                self.list_cache[seq] = item
+                
                 announcements.append({
                     'title': title,
                     'url': detail_url,
@@ -84,7 +89,8 @@ class CCEIScraper(BaseScraper):
                     'views': views,
                     'has_file': has_file,
                     'is_recommend': is_recommend,
-                    'seq': seq
+                    'seq': seq,
+                    'files': item.get('FILE', '')
                 })
                 
             except Exception as e:
@@ -93,9 +99,16 @@ class CCEIScraper(BaseScraper):
                 
         return announcements
         
-    def parse_detail_page(self, html_content):
+    def parse_detail_page(self, html_content, url=None):
         """상세 페이지 파싱"""
         soup = BeautifulSoup(html_content, 'html.parser')
+        
+        # URL에서 SEQ 추출
+        seq = None
+        if url:
+            match = re.search(r'no=(\d+)', url)
+            if match:
+                seq = match.group(1)
         
         # 본문 내용 찾기
         content_area = None
@@ -130,6 +143,21 @@ class CCEIScraper(BaseScraper):
                         
         # 첨부파일 찾기
         attachments = []
+        
+        # 캐시된 리스트 데이터에서 파일 정보 가져오기
+        if seq and seq in self.list_cache:
+            files = self.list_cache[seq].get('FILE', '')
+            if files:
+                # 파일 UUID들이 쉼표로 구분되어 있음
+                file_uuids = [f.strip() for f in files.split(',') if f.strip()]
+                for uuid in file_uuids:
+                    # 다운로드 URL 생성
+                    file_url = f"{self.base_url}/chungbuk/json/common/fileDown.download?uuid={uuid}"
+                    attachments.append({
+                        'name': f'첨부파일_{uuid[:8]}',  # 임시 파일명
+                        'url': file_url,
+                        'uuid': uuid
+                    })
         
         # CCEI 특유의 파일 다운로드 패턴
         # /chungbuk/json/common/fileDown.download?uuid= 패턴
@@ -258,3 +286,80 @@ class CCEIScraper(BaseScraper):
         print(f"\n{'='*50}")
         print(f"Scraping completed. Total announcements processed: {announcement_count}")
         print(f"{'='*50}")
+    
+    def process_announcement(self, announcement, index, output_base='output'):
+        """개별 공고 처리 - CCEI 맞춤형"""
+        print(f"\nProcessing announcement {index}: {announcement['title']}")
+        
+        # 폴더 생성
+        folder_title = self.sanitize_filename(announcement['title'])[:50]
+        folder_name = f"{index:03d}_{folder_title}"
+        folder_path = os.path.join(output_base, folder_name)
+        os.makedirs(folder_path, exist_ok=True)
+        
+        # 상세 페이지 가져오기
+        response = self.get_page(announcement['url'])
+        if not response:
+            return
+            
+        # 상세 내용 파싱 (URL 전달)
+        detail = self.parse_detail_page(response.text, announcement['url'])
+        
+        # 메타 정보 추가
+        meta_info = f"""# {announcement['title']}
+
+**조직**: {announcement.get('organization', 'N/A')}  
+**작성일**: {announcement.get('date', 'N/A')}  
+**조회수**: {announcement.get('views', 'N/A')}  
+**원본 URL**: {announcement['url']}
+
+---
+
+"""
+        
+        # 본문 저장
+        content_path = os.path.join(folder_path, 'content.md')
+        with open(content_path, 'w', encoding='utf-8') as f:
+            f.write(meta_info + detail['content'])
+            
+        print(f"Saved content to: {content_path}")
+        
+        # 첨부파일 다운로드
+        if detail['attachments']:
+            print(f"Found {len(detail['attachments'])} attachment(s)")
+            attachments_folder = os.path.join(folder_path, 'attachments')
+            os.makedirs(attachments_folder, exist_ok=True)
+            
+            for i, attachment in enumerate(detail['attachments']):
+                # 실제 파일 다운로드시 파일명을 Content-Disposition에서 가져옴
+                response = self.session.get(attachment['url'], headers=self.headers, stream=True)
+                if response.status_code == 200:
+                    # Content-Disposition에서 파일명 추출
+                    content_disp = response.headers.get('Content-Disposition', '')
+                    if 'filename=' in content_disp:
+                        match = re.search(r'filename="?([^"\n]+)"?', content_disp)
+                        if match:
+                            filename = match.group(1)
+                            # ISO-8859-1로 인코딩된 경우 디코딩
+                            try:
+                                filename = filename.encode('iso-8859-1').decode('utf-8')
+                            except:
+                                pass
+                            attachment['name'] = filename
+                
+                print(f"  Attachment {i+1}: {attachment['name']}")
+                file_name = self.sanitize_filename(attachment['name'])
+                file_path = os.path.join(attachments_folder, file_name)
+                
+                # 파일 저장
+                with open(file_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                print(f"    Downloaded: {file_path}")
+        else:
+            print("No attachments found")
+                
+        # 잠시 대기 (서버 부하 방지)
+        import time
+        time.sleep(1)

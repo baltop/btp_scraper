@@ -40,7 +40,13 @@ class BaseScraper(ABC):
         """페이지 가져오기"""
         try:
             response = self.session.get(url, verify=self.verify_ssl)
-            response.encoding = 'utf-8'
+            # 인코딩 자동 감지 또는 기본값 설정
+            if response.encoding is None or response.encoding == 'ISO-8859-1':
+                # 한국 사이트의 경우 대부분 UTF-8 또는 EUC-KR
+                try:
+                    response.encoding = response.apparent_encoding
+                except:
+                    response.encoding = 'utf-8'
             return response
         except Exception as e:
             print(f"Error fetching page: {e}")

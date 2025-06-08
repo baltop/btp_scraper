@@ -13,6 +13,7 @@ class DJBEAScraper(BaseScraper):
         super().__init__()
         self.base_url = "https://www.djbea.or.kr"
         self.list_url = "https://www.djbea.or.kr/pms/st/st_0205/list"
+        self.verify_ssl = False  # SSL 인증서 문제 회피
         
     def get_list_url(self, page_num):
         """페이지 번호에 따른 목록 URL 반환"""
@@ -26,88 +27,197 @@ class DJBEAScraper(BaseScraper):
         soup = BeautifulSoup(html_content, 'html.parser')
         announcements = []
         
-        # 목록 컨테이너 찾기
-        list_container = soup.find('ul', class_='generic')
-        if not list_container:
+        # Check if page shows "no posts" message
+        page_text = soup.get_text()
+        if '게시글이 없습니다' in page_text or '등록된 게시물이 없습니다' in page_text:
+            print("No posts found on this page (게시글이 없습니다)")
             return announcements
-            
-        # 각 공고 항목 찾기
-        items = list_container.find_all('li')
         
-        for item in items:
-            try:
-                # 번호
-                num_div = item.find('div', class_='generic')
-                num = num_div.get_text(strip=True) if num_div else ''
-                
-                # 제목 및 링크
-                title_link = item.find('a')
-                if not title_link:
-                    continue
-                    
-                title = title_link.get_text(strip=True)
-                
-                # 상세보기 링크 찾기
-                detail_link = item.find('a', text=re.compile('상세보기'))
-                if detail_link:
-                    detail_url = detail_link.get('href', '')
-                    if detail_url and not detail_url.startswith('http'):
-                        detail_url = urljoin(self.base_url, detail_url)
-                else:
-                    # onclick 이벤트에서 URL 추출 시도
-                    onclick = title_link.get('onclick', '')
-                    if onclick:
-                        # JavaScript 함수에서 파라미터 추출
-                        match = re.search(r"location\.href='([^']+)'", onclick)
-                        if match:
-                            detail_url = urljoin(self.base_url, match.group(1))
+        # Try multiple strategies to find the list container
+        
+        # Strategy 1: Look for table-based list (common in Korean government sites)
+        table = soup.find('table', class_=re.compile('list|board|bbs'))
+        if table:
+            tbody = table.find('tbody')
+            if tbody:
+                rows = tbody.find_all('tr')
+                for row in rows:
+                    try:
+                        # Skip header rows
+                        if row.find('th'):
+                            continue
+                            
+                        cells = row.find_all('td')
+                        if len(cells) < 3:  # Need at least number, title, date
+                            continue
+                        
+                        # Extract data from cells
+                        num = cells[0].get_text(strip=True)
+                        
+                        # Find title and link
+                        title_cell = cells[1]  # Usually second cell
+                        title_link = title_cell.find('a')
+                        if not title_link:
+                            continue
+                            
+                        title = title_link.get_text(strip=True)
+                        
+                        # Extract URL
+                        href = title_link.get('href', '')
+                        onclick = title_link.get('onclick', '')
+                        
+                        # Prioritize onclick over href for javascript:void(0) links
+                        if onclick and (not href or href == '#' or 'javascript:' in href):
+                            # Extract from JavaScript function
+                            # Common patterns: doViewNew('7950', 'ST_0205'), goView('123'), fnView('123')
+                            match = re.search(r"doViewNew\s*\(\s*['\"]?(\d+)['\"]?\s*,\s*['\"]?([^'\"]+)['\"]?\s*\)", onclick)
+                            if match:
+                                seq = match.group(1)
+                                board_type = match.group(2)
+                                detail_url = f"{self.base_url}/pms/st/st_0205/view_new?BBSCTT_SEQ={seq}&BBSCTT_TY_CD={board_type}"
+                            else:
+                                match = re.search(r"(?:goView|fnView|viewDetail)\s*\(\s*['\"]?(\d+)['\"]?\s*\)", onclick)
+                                if match:
+                                    seq = match.group(1)
+                                    detail_url = f"{self.base_url}/pms/st/st_0205/view?seq={seq}"
+                                else:
+                                    match = re.search(r"location\.href\s*=\s*['\"]([^'\"]+)['\"]", onclick)
+                                    if match:
+                                        detail_url = urljoin(self.base_url, match.group(1))
+                                    else:
+                                        continue
+                        elif href and href != '#' and 'javascript:' not in href:
+                            detail_url = urljoin(self.base_url, href)
                         else:
                             continue
+                        
+                        # Extract metadata
+                        meta_info = {}
+                        
+                        # Date (usually 3rd or 4th cell)
+                        if len(cells) > 2:
+                            meta_info['date'] = cells[2].get_text(strip=True)
+                        
+                        # Views (usually last or second to last cell)
+                        if len(cells) > 3:
+                            meta_info['views'] = cells[-1].get_text(strip=True)
+                        
+                        # Check for attachment icon
+                        has_attachment = bool(row.find('img', src=re.compile('file|attach|clip')))
+                        
+                        announcements.append({
+                            'num': num,
+                            'title': title,
+                            'url': detail_url,
+                            'has_attachment': has_attachment,
+                            **meta_info
+                        })
+                        
+                    except Exception as e:
+                        print(f"Error parsing table row: {e}")
+                        continue
+        
+        # Strategy 2: Look for ul/li based list
+        if not announcements:
+            # Try multiple ul patterns
+            list_containers = soup.find_all('ul', class_=re.compile('list|board|bbs|basic'))
+            for list_container in list_containers:
+                if not list_container:
+                    continue
+                items = list_container.find_all('li')
+                
+                for item in items:
+                    try:
+                        # Find title and link
+                        title_link = item.find('a')
+                        if not title_link:
+                            continue
+                            
+                        title = title_link.get_text(strip=True)
+                        
+                        # Extract URL (similar logic as above)
+                        href = title_link.get('href', '')
+                        onclick = title_link.get('onclick', '')
+                        
+                        # Prioritize onclick over href for javascript:void(0) links
+                        if onclick and (not href or href == '#' or 'javascript:' in href):
+                            # Extract from JavaScript function
+                            # Common patterns: doViewNew('7950', 'ST_0205'), goView('123'), fnView('123')
+                            match = re.search(r"doViewNew\s*\(\s*['\"]?(\d+)['\"]?\s*,\s*['\"]?([^'\"]+)['\"]?\s*\)", onclick)
+                            if match:
+                                seq = match.group(1)
+                                board_type = match.group(2)
+                                detail_url = f"{self.base_url}/pms/st/st_0205/view_new?BBSCTT_SEQ={seq}&BBSCTT_TY_CD={board_type}"
+                            else:
+                                match = re.search(r"(?:goView|fnView|viewDetail)\s*\(\s*['\"]?(\d+)['\"]?\s*\)", onclick)
+                                if match:
+                                    seq = match.group(1)
+                                    detail_url = f"{self.base_url}/pms/st/st_0205/view?seq={seq}"
+                                else:
+                                    continue
+                        elif href and href != '#' and 'javascript:' not in href:
+                            detail_url = urljoin(self.base_url, href)
+                        else:
+                            continue
+                        
+                        # Extract metadata
+                        meta_info = {}
+                        
+                        # Look for date
+                        date_match = re.search(r'(\d{4}[-./]\d{2}[-./]\d{2})', item.get_text())
+                        if date_match:
+                            meta_info['date'] = date_match.group(1)
+                        
+                        announcements.append({
+                            'num': len(announcements) + 1,
+                            'title': title,
+                            'url': detail_url,
+                            'has_attachment': False,
+                            **meta_info
+                        })
+                        
+                    except Exception as e:
+                        print(f"Error parsing list item: {e}")
+                        continue
+        
+        # Strategy 3: Look for div-based list
+        if not announcements:
+            # Look for repeated div patterns
+            list_items = soup.find_all('div', class_=re.compile('item|article|post'))
+            for item in list_items:
+                try:
+                    title_elem = item.find(['h3', 'h4', 'h5', 'a', 'span'], class_=re.compile('title|subject'))
+                    if not title_elem:
+                        continue
+                    
+                    title = title_elem.get_text(strip=True)
+                    
+                    # Find link
+                    if title_elem.name == 'a':
+                        link = title_elem
+                    else:
+                        link = item.find('a')
+                    
+                    if not link:
+                        continue
+                    
+                    href = link.get('href', '')
+                    if href and href != '#':
+                        detail_url = urljoin(self.base_url, href)
                     else:
                         continue
-                
-                # 메타 정보 추출
-                meta_info = {}
-                
-                # 등록일 찾기
-                date_elem = item.find(text=re.compile('등록일'))
-                if date_elem:
-                    date_text = date_elem.find_next().get_text(strip=True)
-                    meta_info['date'] = date_text
-                
-                # 주관기관 찾기
-                org_elem = item.find(text=re.compile('주관기관'))
-                if org_elem:
-                    org_text = org_elem.find_next().get_text(strip=True)
-                    meta_info['organization'] = org_text
-                
-                # 공고기간 찾기
-                period_elem = item.find(text=re.compile('공고기간'))
-                if period_elem:
-                    period_text = period_elem.find_next().get_text(strip=True)
-                    meta_info['period'] = period_text
-                
-                # 조회수 찾기
-                views_elem = item.find(text=re.compile('조회수'))
-                if views_elem:
-                    views_text = views_elem.find_next().get_text(strip=True)
-                    meta_info['views'] = views_text
-                
-                # 첨부파일 여부 확인
-                has_attachment = bool(item.find('img', alt=re.compile('다운로드|첨부')))
-                
-                announcements.append({
-                    'num': num,
-                    'title': title,
-                    'url': detail_url,
-                    'has_attachment': has_attachment,
-                    **meta_info
-                })
-                
-            except Exception as e:
-                print(f"Error parsing item: {e}")
-                continue
-                
+                    
+                    announcements.append({
+                        'num': len(announcements) + 1,
+                        'title': title,
+                        'url': detail_url,
+                        'has_attachment': False
+                    })
+                    
+                except Exception as e:
+                    print(f"Error parsing div item: {e}")
+                    continue
+        
         return announcements
         
     def parse_detail_page(self, html_content):
@@ -123,13 +233,48 @@ class DJBEAScraper(BaseScraper):
             'div.view_content',
             'div.content_area',
             'div.board_content',
-            'div.bbs_content'
+            'div.bbs_content',
+            'div.view_cont',
+            'div.view_area',
+            'div#content',
+            'td.content',
+            'div.detail_content',
+            'div[class*="view"]',
+            'div[class*="content"]',
+            'table.board_view td'
         ]
         
         for selector in content_selectors:
             content_area = soup.select_one(selector)
             if content_area:
-                break
+                # Check if it has substantial content
+                text = content_area.get_text(strip=True)
+                if len(text) > 50:  # Arbitrary threshold
+                    break
+                else:
+                    content_area = None
+        
+        # If no content area found, look for the main text area
+        if not content_area:
+            # Try to find the largest text block
+            all_divs = soup.find_all('div')
+            max_text_div = None
+            max_text_len = 0
+            
+            for div in all_divs:
+                # Skip navigation and header divs
+                if div.get('class'):
+                    class_str = ' '.join(div.get('class'))
+                    if any(skip in class_str for skip in ['nav', 'header', 'footer', 'menu', 'gnb', 'lnb']):
+                        continue
+                
+                text = div.get_text(strip=True)
+                if len(text) > max_text_len and len(text) > 100:
+                    max_text_len = len(text)
+                    max_text_div = div
+            
+            if max_text_div:
+                content_area = max_text_div
                 
         # 공고 요약 정보 찾기
         summary_area = soup.find('div', class_='summary') or soup.find('div', class_='board_summary')
@@ -146,41 +291,66 @@ class DJBEAScraper(BaseScraper):
         # 첨부파일 찾기
         attachments = []
         
-        # 첨부파일 테이블 찾기
-        file_table = soup.find('table', class_=re.compile('file|attach'))
-        if file_table:
+        # Strategy 1: Look for file table
+        file_tables = soup.find_all('table', class_=re.compile('file|attach|download'))
+        for file_table in file_tables:
             file_rows = file_table.find_all('tr')
             for row in file_rows:
-                # 파일명과 크기 추출
-                file_name_elem = row.find('a') or row.find('span', class_='file_name')
-                if file_name_elem:
-                    file_name = file_name_elem.get_text(strip=True)
+                # Skip header rows
+                if row.find('th'):
+                    continue
                     
-                    # 파일 다운로드 링크 찾기
-                    file_link = row.find('a', href=True)
-                    if file_link:
-                        file_url = file_link.get('href', '')
-                        if not file_url.startswith('http'):
-                            file_url = urljoin(self.base_url, file_url)
-                    else:
-                        # JavaScript 다운로드 함수 확인
-                        onclick = file_name_elem.get('onclick', '')
-                        if onclick:
-                            # 파일 ID 추출
-                            match = re.search(r"download\('([^']+)'", onclick)
-                            if match:
-                                file_id = match.group(1)
-                                file_url = f"{self.base_url}/download?fileId={file_id}"
-                            else:
-                                continue
-                        else:
-                            continue
+                # Find file link
+                file_link = row.find('a', href=True)
+                if file_link:
+                    file_name = file_link.get_text(strip=True)
+                    file_url = file_link.get('href', '')
+                    
+                    if not file_url.startswith('http'):
+                        file_url = urljoin(self.base_url, file_url)
                     
                     if file_name and file_url:
                         attachments.append({
                             'name': file_name,
                             'url': file_url
                         })
+        
+        # Strategy 2: Look for download links with JavaScript
+        if not attachments:
+            download_links = soup.find_all('a', onclick=re.compile('download|fileDown'))
+            for link in download_links:
+                file_name = link.get_text(strip=True)
+                onclick = link.get('onclick', '')
+                
+                # Extract file ID or parameters from onclick
+                # Common patterns: fnDownload('123'), fileDownload('123', '456')
+                match = re.search(r"(?:fnDownload|fileDownload|download)\s*\(\s*['\"]?([^'\"]+)['\"]?", onclick)
+                if match:
+                    file_id = match.group(1)
+                    # Construct download URL based on common patterns
+                    file_url = f"{self.base_url}/pms/common/file/download?fileId={file_id}"
+                    
+                    if file_name:
+                        attachments.append({
+                            'name': file_name,
+                            'url': file_url
+                        })
+        
+        # Strategy 3: Look for any links with file extensions
+        if not attachments:
+            all_links = soup.find_all('a', href=re.compile(r'\.(pdf|hwp|doc|docx|xls|xlsx|zip|rar)', re.I))
+            for link in all_links:
+                file_name = link.get_text(strip=True) or link.get('href', '').split('/')[-1]
+                file_url = link.get('href', '')
+                
+                if not file_url.startswith('http'):
+                    file_url = urljoin(self.base_url, file_url)
+                
+                if file_name and file_url:
+                    attachments.append({
+                        'name': file_name,
+                        'url': file_url
+                    })
         
         # 본문을 마크다운으로 변환
         content_md = ""
@@ -192,6 +362,8 @@ class DJBEAScraper(BaseScraper):
                 content_md += content_area
             else:
                 content_md += self.h.handle(str(content_area))
+        else:
+            content_md += "본문 내용을 찾을 수 없습니다."
         
         return {
             'content': content_md,

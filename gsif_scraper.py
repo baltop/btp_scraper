@@ -70,6 +70,12 @@ class GSIFScraper(BaseScraper):
                     if match:
                         detail_url = urljoin(self.base_url, match.group(1))
                 elif 'bbs_view.do' in href:
+                    # href가 /로 시작하지 않으면 /gsipa/를 앞에 추가
+                    if not href.startswith('http'):
+                        if not href.startswith('/'):
+                            href = '/gsipa/' + href
+                        elif not href.startswith('/gsipa'):
+                            href = '/gsipa' + href
                     detail_url = urljoin(self.base_url, href)
                 
                 if not detail_url:
@@ -110,8 +116,12 @@ class GSIFScraper(BaseScraper):
         table = soup.find('table')
         if table:
             rows = table.find_all('tr')
-            # 보통 4번째 행에 본문이 있음
-            if len(rows) >= 4:
+            # img_td 클래스를 가진 td 찾기 (본문이 있는 곳)
+            content_td = soup.find('td', class_='img_td')
+            if content_td:
+                content_area = content_td
+            elif len(rows) >= 4:
+                # 대체 방법: 4번째 행에서 찾기
                 content_td = rows[3].find('td')
                 if content_td:
                     content_area = content_td
@@ -119,26 +129,32 @@ class GSIFScraper(BaseScraper):
         # 첨부파일 찾기
         attachments = []
         
-        # 파일 행 찾기 (보통 3번째 행)
-        if table and len(rows) >= 3:
-            file_row = rows[2]
-            file_td = file_row.find_all('td')
-            if len(file_td) > 1:
-                # 파일 링크들 찾기
-                file_links = file_td[1].find_all('a')
-                for link in file_links:
-                    file_name = link.get_text(strip=True)
-                    file_url = link.get('href', '')
-                    
-                    if file_url and 'bbs_download.do' in file_url:
-                        # 상대 경로를 절대 경로로 변환
-                        file_url = urljoin(self.base_url, file_url)
+        # 파일 행 찾기 - th 태그에 "파일"이 포함된 행 찾기
+        if table:
+            for row in rows:
+                th = row.find('th')
+                if th and '파일' in th.get_text():
+                    # 이 행에서 모든 링크 찾기
+                    file_links = row.find_all('a')
+                    for link in file_links:
+                        file_name = link.get_text(strip=True)
+                        file_url = link.get('href', '')
                         
-                        if file_name and not file_name.isspace():
-                            attachments.append({
-                                'name': file_name,
-                                'url': file_url
-                            })
+                        if file_url and 'bbs_download.do' in file_url:
+                            # 상대 경로를 절대 경로로 변환
+                            if not file_url.startswith('http'):
+                                if not file_url.startswith('/'):
+                                    file_url = '/gsipa/' + file_url
+                                elif not file_url.startswith('/gsipa'):
+                                    file_url = '/gsipa' + file_url
+                            file_url = urljoin(self.base_url, file_url)
+                            
+                            if file_name and not file_name.isspace():
+                                attachments.append({
+                                    'name': file_name,
+                                    'url': file_url
+                                })
+                    break
         
         # 본문을 마크다운으로 변환
         content_md = ""
