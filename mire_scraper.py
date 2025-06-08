@@ -190,3 +190,69 @@ class MIREScraper(BaseScraper):
             'content': content_md,
             'attachments': attachments
         }
+    
+    def get_page(self, url):
+        """페이지 가져오기 - EUC-KR 인코딩 처리"""
+        try:
+            response = self.session.get(url, headers=self.headers, verify=self.verify_ssl)
+            response.encoding = 'euc-kr'  # MIRE 사이트는 EUC-KR 사용
+            return response
+        except Exception as e:
+            print(f"Error fetching page {url}: {e}")
+            return None
+    
+    def download_file(self, url, save_path):
+        """파일 다운로드 - MIRE 맞춤형 (EUC-KR 파일명 처리)"""
+        try:
+            # Referer 헤더 추가
+            headers = self.headers.copy()
+            headers['Referer'] = self.base_url
+            
+            response = self.session.get(url, headers=headers, stream=True, verify=self.verify_ssl)
+            response.raise_for_status()
+            
+            # Content-Disposition에서 파일명 추출
+            content_disposition = response.headers.get('Content-Disposition', '')
+            if content_disposition:
+                import re
+                filename_match = re.search(r'filename[^;=\n]*=(([\'"]).*?\2|[^;\n]*)', content_disposition)
+                if filename_match:
+                    filename = filename_match.group(1).strip('"\'')
+                    # EUC-KR로 인코딩된 파일명 처리
+                    try:
+                        # 먼저 latin-1로 디코딩 후 euc-kr로 인코딩된 것으로 가정하고 다시 디코딩
+                        filename = filename.encode('latin-1').decode('euc-kr')
+                    except:
+                        try:
+                            # 그래도 안되면 UTF-8 시도
+                            filename = filename.encode('latin-1').decode('utf-8')
+                        except:
+                            # 모두 실패하면 원본 사용
+                            pass
+                    
+                    # 파일명이 유효하면 save_path 업데이트
+                    if filename and not filename.isspace():
+                        save_dir = os.path.dirname(save_path)
+                        # + 기호를 공백으로 변경
+                        filename = filename.replace('+', ' ')
+                        # URL 디코딩
+                        from urllib.parse import unquote
+                        filename = unquote(filename)
+                        save_path = os.path.join(save_dir, self.sanitize_filename(filename))
+            
+            # 파일 저장
+            with open(save_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        
+            file_size = os.path.getsize(save_path)
+            print(f"Downloaded: {save_path} ({file_size:,} bytes)")
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            print(f"Network error downloading {url}: {e}")
+            return False
+        except Exception as e:
+            print(f"Error downloading file {url}: {e}")
+            return False

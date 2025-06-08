@@ -32,9 +32,11 @@ from gsif_scraper import GSIFScraper
 from djbea_scraper import DJBEAScraper
 from mire_scraper import MIREScraper
 from site_scrapers import (
-    DCBScraper, JBFScraper, CEPAScraper, CheongjuCCIScraper,
+    DCBScraper, CheongjuCCIScraper,
     GIBScraper, GBTPScraper, DGDPScraper, GEPAScraper
 )
+from jbf_scraper import JBFScraper
+from cepa_scraper import CEPAScraper
 
 def main():
     parser = argparse.ArgumentParser(
@@ -53,7 +55,7 @@ def main():
     
     parser.add_argument(
         '--site', 
-        choices=['btp', 'itp', 'ccei', 'kidp', 'gsif', 'djbea', 'mire', 'dcb', 'all'],
+        choices=['btp', 'itp', 'ccei', 'kidp', 'gsif', 'djbea', 'mire', 'dcb', 'jbf', 'cepa', 'all'],
         default='btp',
         help='수집할 사이트 선택 (기본값: btp)'
     )
@@ -81,7 +83,7 @@ def main():
     # 수집할 사이트 목록 결정
     sites_to_scrape = []
     if args.site == 'all':
-        sites_to_scrape = ['btp', 'itp', 'ccei', 'kidp', 'gsif', 'djbea', 'mire', 'dcb']
+        sites_to_scrape = ['btp', 'itp', 'ccei', 'kidp', 'gsif', 'djbea', 'mire', 'dcb', 'jbf', 'cepa']
     else:
         sites_to_scrape = [args.site]
     
@@ -276,6 +278,54 @@ def main():
                 sys.exit(0)
             except Exception as e:
                 print(f"\n부산디자인진흥원 수집 중 오류가 발생했습니다: {e}")
+                if len(sites_to_scrape) == 1:
+                    sys.exit(1)
+                    
+        elif site == 'jbf':
+            print(f"\n{'='*60}")
+            print("전남바이오진흥원 지원사업 공고 수집을 시작합니다.")
+            print(f"수집할 페이지 수: {args.pages}")
+            print(f"{'='*60}")
+            
+            output_dir = os.path.join(args.output, 'jbf')
+            os.makedirs(output_dir, exist_ok=True)
+            
+            try:
+                scraper = JBFScraper()
+                scraper.scrape_pages(max_pages=args.pages, output_base=output_dir)
+                
+                print(f"\n전남바이오진흥원 수집이 완료되었습니다.")
+                print(f"결과는 '{output_dir}' 폴더에 저장되었습니다.")
+                
+            except KeyboardInterrupt:
+                print("\n\n사용자에 의해 중단되었습니다.")
+                sys.exit(0)
+            except Exception as e:
+                print(f"\n전남바이오진흥원 수집 중 오류가 발생했습니다: {e}")
+                if len(sites_to_scrape) == 1:
+                    sys.exit(1)
+                    
+        elif site == 'cepa':
+            print(f"\n{'='*60}")
+            print("충남경제진흥원 지원사업 공고 수집을 시작합니다.")
+            print(f"수집할 페이지 수: {args.pages}")
+            print(f"{'='*60}")
+            
+            output_dir = os.path.join(args.output, 'cepa')
+            os.makedirs(output_dir, exist_ok=True)
+            
+            try:
+                scraper = CEPAScraper()
+                scraper.scrape_pages(max_pages=args.pages, output_base=output_dir)
+                
+                print(f"\n충남경제진흥원 수집이 완료되었습니다.")
+                print(f"결과는 '{output_dir}' 폴더에 저장되었습니다.")
+                
+            except KeyboardInterrupt:
+                print("\n\n사용자에 의해 중단되었습니다.")
+                sys.exit(0)
+            except Exception as e:
+                print(f"\n충남경제진흥원 수집 중 오류가 발생했습니다: {e}")
                 if len(sites_to_scrape) == 1:
                     sys.exit(1)
     

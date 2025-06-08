@@ -49,7 +49,9 @@ class BaseScraper(ABC):
                     response.encoding = 'utf-8'
             return response
         except Exception as e:
-            print(f"Error fetching page: {e}")
+            print(f"Error fetching page {url}: {e}")
+            import traceback
+            traceback.print_exc()
             return None
             
     def download_file(self, url, save_path):
@@ -128,6 +130,7 @@ class BaseScraper(ABC):
     def process_announcement(self, announcement, index, output_base='output'):
         """개별 공고 처리"""
         print(f"\nProcessing announcement {index}: {announcement['title']}")
+        print(f"URL: {announcement.get('url', 'NO URL')}")
         
         # 폴더 생성
         folder_title = self.sanitize_filename(announcement['title'])[:50]
@@ -138,10 +141,12 @@ class BaseScraper(ABC):
         # 상세 페이지 가져오기
         response = self.get_page(announcement['url'])
         if not response:
+            print(f"Failed to get detail page for: {announcement['title']}")
             return
             
         # 상세 내용 파싱
         detail = self.parse_detail_page(response.text)
+        print(f"Detail parsed - content length: {len(detail['content'])}, attachments: {len(detail['attachments'])}")
         
         # 메타 정보 추가
         meta_info = f"""# {announcement['title']}
