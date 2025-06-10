@@ -3,5 +3,3 @@ beautifulsoup4
 lxml
 html2text
 urllib3
-pyyaml
-chardet
