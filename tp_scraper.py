@@ -31,7 +31,7 @@ import os
 from btp_scraper import BTPScraper
 from itp_scraper import ITPScraper
 from ccei_scraper import CCEIScraper
-from kidp_scraper import KIDPScraper
+from enhanced_kidp_scraper import EnhancedKIDPScraper
 from gsif_scraper import GSIFScraper
 from djbea_scraper import DJBEAScraper
 from mire_scraper import MIREScraper
@@ -180,7 +180,7 @@ def main():
             os.makedirs(output_dir, exist_ok=True)
             
             try:
-                scraper = KIDPScraper()
+                scraper = EnhancedKIDPScraper()
                 scraper.scrape_pages(max_pages=args.pages, output_base=output_dir)
                 
                 print(f"\n한국디자인진흥원 수집이 완료되었습니다.")

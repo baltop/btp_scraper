@@ -22,16 +22,16 @@ sites:
 
   itp:
     name: "인천테크노파크"
-    scraper_class: "ITPScraper"
-    scraper_module: "itp_scraper"
-    base_url: "https://www.itp.or.kr"
-    list_url: "https://www.itp.or.kr/kr/index.php"
+    scraper_class: "EnhancedITPScraper"
+    scraper_module: "enhanced_itp_scraper"
+    base_url: "https://itp.or.kr"
+    list_url: "https://itp.or.kr/intro.asp?tmid=13"
     type: "javascript"
     encoding: "auto"
-    ssl_verify: true
+    ssl_verify: false
     pagination:
       type: "query_param"
-      param: "page"
+      param: "PageNum"
 
   ccei:
     name: "충북창조경제혁신센터"
@@ -55,16 +55,21 @@ sites:
 
   kidp:
     name: "한국디자인진흥원"
-    scraper_class: "KIDPScraper"
-    scraper_module: "kidp_scraper"
-    base_url: "https://www.kidp.or.kr"
-    list_url: "https://www.kidp.or.kr/bbs/list.do?BMENU_CODE=10020001"
+    scraper_class: "EnhancedKIDPScraper"
+    scraper_module: "enhanced_kidp_scraper"
+    base_url: "https://kidp.or.kr"
+    list_url: "https://kidp.or.kr/?menuno=1202"
     type: "javascript"
     encoding: "auto"
     ssl_verify: true
     pagination:
       type: "query_param"
       param: "page"
+    javascript_config:
+      onclick_patterns:
+        - "submitForm\\(this,'(\\w+)',(\\d+)\\)"
+      detail_url_template: "https://kidp.or.kr/?menuno=1202&bbsno={seq}&siteno=16&act=view&ztag=rO0ABXQAMzxjYWxsIHR5cGU9ImJvYXJkIiBubz0iNjIyIiBza2luPSJraWRwX2JicyI%2BPC9jYWxsPg%3D%3D"
+      file_url_template: "https://kidp.or.kr/?menuno=1202&bbsno={file_id}&siteno=16&act=down&ztag=rO0ABXQAMzxjYWxsIHR5cGU9ImJvYXJkIiBubz0iNjIyIiBza2luPSJraWRwX2JicyI%2BPC9jYWxsPg%3D%3D"
 
   gsif:
     name: "강릉과학산업진흥원"
@@ -94,10 +99,10 @@ sites:
 
   mire:
     name: "환동해산업연구원"
-    scraper_class: "MIREScraper"
-    scraper_module: "mire_scraper"
-    base_url: "http://www.mire.re.kr"
-    list_url: "http://www.mire.re.kr/brd/board.php?bo_table=support"
+    scraper_class: "EnhancedMIREScraper"
+    scraper_module: "enhanced_mire_scraper"
+    base_url: "http://mire.re.kr"
+    list_url: "http://mire.re.kr/sub4_4.php"
     type: "session_based"
     encoding: "euc-kr"
     ssl_verify: false
@@ -195,6 +200,25 @@ sites:
     pagination:
       type: "query_param"
       param: "page"
+
+  koema:
+    name: "한국에너지공단 조합"
+    scraper_class: "KOEMAScraper"
+    scraper_module: "site_scrapers"
+    base_url: "https://www.koema.or.kr"
+    list_url: "https://www.koema.or.kr/koema/report/total_notice.html"
+    type: "standard_table"
+    encoding: "auto"
+    ssl_verify: true
+    pagination:
+      type: "query_param"
+      param: "page"
+    selectors:
+      table: "table"
+      rows: "tr"
+      title_link: "a[href]"
+      date: "td"
+      writer: "td"
 
 # 기본 설정
 defaults:

@@ -259,3 +259,6 @@ class NewSiteScraper(BaseScraper):
    - 다양한 인코딩 조합 시도
 
 
+# pip install  대신에 uv add를 사용할 것.
+
+# robots.txt는 무시할 것.
