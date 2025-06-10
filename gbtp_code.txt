@@ -1,0 +1,209 @@
+# GBTP (경북테크노파크) 스크래퍼 개발 로그 및 기술 문서
+
+## 프로젝트 개요
+- **사이트**: 경북테크노파크 (https://gbtp.or.kr)
+- **대상 URL**: https://gbtp.or.kr/user/board.do?bbsId=BBSMSTR_000000000023
+- **목적**: 지원사업 공고 수집 및 첨부파일 다운로드
+- **개발 완료일**: 2025년 6월 10일
+
+## 구현 완료 사항
+
+### 1. 기본 스크래퍼 구조
+- `gbtp_scraper.py` 파일 생성
+- `BaseScraper` 클래스 상속
+- `tp_scraper.py`에 통합 완료
+- 커맨드라인 지원: `python tp_scraper.py --site gbtp`
+
+### 2. 사이트 구조 분석 결과
+
+#### 2.1 목록 페이지 구조
+- **URL 패턴**: `?pageIndex=2`, `?pageIndex=3` 등으로 페이지네이션
+- **테이블 구조**: 7개 컬럼 (번호, 상태, 제목, 공고기간, 조회수, 첨부, 작성자)
+- **JavaScript 네비게이션**: `fn_detail('bbsSeq','pageIndex')` 함수 사용
+- **첨부파일 표시**: `<i class="far fa-file-download"></i>` 아이콘
+
+#### 2.2 상세 페이지 구조 (중요!)
+- **JavaScript 의존성**: 실제 상세 내용은 JavaScript 실행 필요
+- **HTTP 요청 제한**: GET/POST 요청으로는 실제 상세 페이지 접근 불가
+- **첨부파일 패턴**: `fn_egov_downFile('FILE_ID','fileSn')` 형태
+- **다운로드 URL**: `/cmm/fms/FileDown.do?atchFileId=FILE_ID&fileSn=fileSn`
+
+### 3. 주요 기술적 특이점
+
+#### 3.1 SSL 인증서 문제
+```python
+self.verify_ssl = False  # SSL 인증서 검증 비활성화 필요
+```
+
+#### 3.2 세션 관리
+```python
+def _init_session(self):
+    """세션 초기화 - 메인 페이지 방문하여 쿠키 획득"""
+    response = self.session.get(self.base_url, verify=self.verify_ssl)
+```
+
+#### 3.3 첨부파일 아이콘 감지
+```python
+# 기존: class='fa-file-download' (감지 실패)
+# 수정: class='far fa-file-download' (정상 감지)
+has_attachment = bool(file_cell.find('i', class_='far fa-file-download'))
+```
+
+#### 3.4 POST 요청으로 상세 페이지 접근 시도
+```python
+detail_data = {
+    'bbsId': 'BBSMSTR_000000000023',
+    'flag': 'view',
+    'bbsSeq': bbs_seq,
+    'pageIndex': page_index
+}
+response = self.session.post(detail_url, data=detail_data, verify=self.verify_ssl)
+```
+
+### 4. 첨부파일 다운로드 이슈 (핵심 문제)
+
+#### 4.1 문제 상황
+- **목록 페이지**: 모든 공고에 첨부파일 아이콘 표시됨 (정상)
+- **상세 페이지**: HTTP 요청으로는 실제 첨부파일 링크 접근 불가
+- **JavaScript 필요**: `fn_detail()` 함수 실행 시에만 실제 첨부파일 표시
+
+#### 4.2 Playwright 테스트 결과 (JavaScript 실행)
+```javascript
+// 성공 사례: bbsSeq=10107
+fn_detail('10107','1')
+// 결과: 2개 첨부파일 발견
+// - [붙임1]2025년도 미래산업 기술정보 리더 교육프로그램 참여기업 모집 공고.hwp
+// - [붙임2]구미산업기술정보센터 2025년 미래산업 기술정보 리더 교육 팸플릿.pdf
+// 다운로드 패턴: fn_egov_downFile('FILE_000000000020647','0')
+```
+
+#### 4.3 HTTP 요청 테스트 결과
+```python
+# POST 요청 시도
+response = session.post(detail_url, data={'bbsSeq': '10107', ...})
+# 결과: 544654 bytes 응답, 하지만 실제 첨부파일 링크 없음
+# 발견: fn_egov_downFile 함수 정의만 있음 (실제 호출 없음)
+```
+
+### 5. 현재 구현 상태
+
+#### 5.1 정상 동작하는 기능
+- ✅ 목록 페이지 파싱
+- ✅ 기본 공고 정보 추출 (제목, 작성자, 기간, 상태 등)
+- ✅ 첨부파일 존재 여부 감지
+- ✅ 페이지네이션 지원
+- ✅ 세션 관리
+
+#### 5.2 제한 사항
+- ❌ 첨부파일 실제 다운로드 불가 (JavaScript 의존성)
+- ⚠️ 상세 내용이 목록 페이지 형태로 저장됨
+
+### 6. 코드 구조
+
+#### 6.1 주요 메소드
+```python
+class GBTPScraper(BaseScraper):
+    def _init_session(self):          # 세션 초기화
+    def get_list_url(self, page_num): # 페이지 URL 생성
+    def parse_list_page(self):        # 목록 파싱
+    def parse_detail_page(self):      # 상세 페이지 파싱
+    def process_announcement(self):   # 커스텀 공고 처리 (POST 요청 포함)
+```
+
+#### 6.2 첨부파일 검색 로직
+```python
+# 1차: href 속성에서 fn_egov_downFile 검색
+download_links = soup.find_all('a', href=re.compile(r'javascript:.*fn_egov_downFile'))
+
+# 2차: onclick 속성에서 fn_egov_downFile 검색  
+onclick_links = soup.find_all('a', onclick=re.compile(r'fn_egov_downFile'))
+
+# 3차: class="view_file_download" 검색
+view_file_links = soup.find_all('a', class_='view_file_download')
+
+# 4차: 모든 onclick 속성 검색
+all_elements = soup.find_all(onclick=re.compile(r'fn_egov_downFile'))
+```
+
+## 추후 개선 방안
+
+### 1. JavaScript 실행 환경 도입
+- **Playwright/Selenium 통합**: 실제 브라우저 환경에서 첨부파일 접근
+- **하이브리드 접근**: 목록은 HTTP, 상세는 JavaScript 실행
+
+### 2. 대안 접근 방법
+- **API 분석**: 개발자 도구로 AJAX 요청 패턴 분석
+- **직접 파일 URL 구성**: FILE_ID 패턴 분석하여 직접 URL 생성
+- **세션 강화**: 더 정교한 세션 관리로 인증 우회
+
+### 3. 에러 처리 개선
+```python
+# 현재: 첨부파일 없음으로 처리
+# 개선: JavaScript 필요 안내 메시지 추가
+if not attachments and announcement['has_attachment']:
+    # JavaScript 실행 필요 안내
+```
+
+## 디버깅 정보
+
+### 1. 테스트 명령어
+```bash
+# 기본 테스트
+python tp_scraper.py --site gbtp --pages 1
+
+# 개별 테스트
+python3 -c "from gbtp_scraper import GBTPScraper; scraper = GBTPScraper(); ..."
+```
+
+### 2. 주요 URL 패턴
+- 목록: `https://gbtp.or.kr/user/board.do?bbsId=BBSMSTR_000000000023&pageIndex=N`
+- 상세: `https://gbtp.or.kr/user/board.do` (POST with bbsSeq, flag=view)
+- 파일: `https://gbtp.or.kr/cmm/fms/FileDown.do?atchFileId=FILE_ID&fileSn=N`
+
+### 3. 브라우저 테스트
+```javascript
+// 브라우저 콘솔에서 직접 테스트
+fn_detail('10107','1');  // 첫 번째 공고 상세 보기
+// 결과 확인 후 attachment 패턴 분석
+```
+
+## 주의사항
+
+### 1. 사이트 변경 대응
+- **JavaScript 함수명 변경**: `fn_detail` → 다른 이름으로 변경 가능
+- **파라미터 순서 변경**: `(bbsSeq, pageIndex)` 순서 변경 가능
+- **CSS 클래스 변경**: `far fa-file-download` → 다른 클래스로 변경 가능
+
+### 2. 성능 고려사항
+- **요청 간격**: `time.sleep(1)` 서버 부하 방지
+- **SSL 인증서**: 주기적으로 `verify=True` 시도해볼 것
+- **세션 만료**: 장시간 실행 시 세션 재초기화 필요
+
+### 3. 확장성
+- **다른 게시판**: bbsId 변경으로 다른 게시판 지원 가능
+- **파일 유형 확장**: `.hwp`, `.pdf` 외 다른 확장자 지원
+- **메타데이터 추가**: 파일 크기, 업로드 날짜 등 정보 수집
+
+---
+
+## 세션 로그 요약
+
+### 개발 과정
+1. **사이트 구조 분석**: Playwright를 사용한 동적 분석
+2. **기본 스크래퍼 구현**: BaseScraper 상속하여 기본 기능 구현
+3. **첨부파일 감지 수정**: `fa-file-download` → `far fa-file-download`
+4. **POST 요청 도입**: JavaScript 우회를 위한 POST 요청 시도
+5. **다중 URL 패턴 테스트**: 여러 URL 패턴으로 상세 페이지 접근 시도
+6. **첨부파일 파싱 강화**: 다양한 선택자로 첨부파일 링크 검색
+7. **문제 진단**: JavaScript 의존성으로 인한 한계 확인
+
+### 최종 결과
+- **기능**: 공고 목록 및 기본 정보 수집 완료
+- **제한**: 첨부파일 다운로드는 JavaScript 환경 필요
+- **상태**: 프로덕션 사용 가능 (첨부파일 제외)
+
+### 기술적 인사이트
+1. **JavaScript 의존 사이트 증가**: 정적 HTTP 요청만으로는 한계
+2. **세션 관리의 중요성**: 초기 세션 확보 필요
+3. **다단계 폴백 전략**: 여러 방법으로 시도하여 성공률 향상
+4. **사이트별 특화 필요**: 표준화된 접근법으로는 모든 사이트 대응 어려움

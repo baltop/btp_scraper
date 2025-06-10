@@ -189,7 +189,11 @@ class BaseScraper(ABC):
                     file_name = f"attachment_{i+1}"
                     
                 file_path = os.path.join(attachments_folder, file_name)
-                self.download_file(attachment['url'], file_path)
+                # GIB 특화 처리: attachment 정보 전체 전달
+                if hasattr(self, '_download_gib_file') and attachment['url'] == 'gib_download':
+                    self.download_file(attachment['url'], file_path, attachment_info=attachment)
+                else:
+                    self.download_file(attachment['url'], file_path)
         else:
             print("No attachments found")
                 
