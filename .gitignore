@@ -180,7 +180,7 @@ output/
 **/.claude/settings.local.json
 uv.lock
 
-
+output*/
 
 page/
 
