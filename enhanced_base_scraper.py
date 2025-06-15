@@ -483,7 +483,12 @@ class EnhancedBaseScraper(ABC):
                 
                 if not announcements:
                     logger.warning(f"페이지 {page_num}에 공고가 없습니다")
-                    stop_reason = "공고 없음"
+                    if page_num == 1:
+                        logger.error("첫 페이지에 공고가 없습니다. 사이트 구조를 확인해주세요.")
+                        stop_reason = "첫 페이지 공고 없음"
+                    else:
+                        logger.info("마지막 페이지에 도달했습니다.")
+                        stop_reason = "마지막 페이지 도달"
                     break
                 
                 logger.info(f"페이지 {page_num}에서 {len(announcements)}개 공고 발견")
@@ -534,9 +539,21 @@ class EnhancedBaseScraper(ABC):
         response = self.get_page(page_url)
         
         if not response:
+            logger.warning(f"페이지 {page_num} 응답을 가져올 수 없습니다")
             return []
         
-        return self.parse_list_page(response.text)
+        # 페이지가 에러 상태거나 잘못된 경우 감지
+        if response.status_code >= 400:
+            logger.warning(f"페이지 {page_num} HTTP 에러: {response.status_code}")
+            return []
+        
+        announcements = self.parse_list_page(response.text)
+        
+        # 추가 마지막 페이지 감지 로직
+        if not announcements and page_num > 1:
+            logger.info(f"페이지 {page_num}에 공고가 없어 마지막 페이지로 판단됩니다")
+        
+        return announcements
 
 
 class StandardTableScraper(EnhancedBaseScraper):

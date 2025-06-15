@@ -8,6 +8,7 @@ from enhanced_base_scraper import StandardTableScraper
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 import logging
+from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,36 @@ class EnhancedBTPScraper(StandardTableScraper):
                 continue
         
         logger.info(f"{len(announcements)}개 공고 파싱 완료")
+        return announcements
+    
+    def _get_page_announcements(self, page_num: int) -> List[Dict[str, Any]]:
+        """페이지별 공고 목록 가져오기 - BTP 전용"""
+        page_url = self.get_list_url(page_num)
+        response = self.get_page(page_url)
+        
+        if not response:
+            logger.warning(f"페이지 {page_num} 응답을 가져올 수 없습니다")
+            return []
+        
+        # 페이지가 에러 상태거나 잘못된 경우 감지
+        if response.status_code >= 400:
+            logger.warning(f"페이지 {page_num} HTTP 에러: {response.status_code}")
+            return []
+        
+        announcements = self.parse_list_page(response.text)
+        
+        # BTP 특화: 페이지에 "등록된 게시물이 없습니다" 또는 빈 테이블이 있는지 확인
+        if not announcements and page_num > 1:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # "등록된 게시물이 없습니다" 메시지 확인
+            no_result_elements = soup.find_all(text=lambda text: text and ('등록된 게시물이 없습니다' in text or '데이터가 없습니다' in text or '게시물이 없습니다' in text))
+            
+            if no_result_elements:
+                logger.info(f"BTP 페이지 {page_num}: '등록된 게시물이 없습니다' 메시지 발견 - 마지막 페이지")
+            else:
+                logger.info(f"BTP 페이지 {page_num}: 공고가 없어 마지막 페이지로 판단됩니다")
+        
         return announcements
     
     def _extract_additional_fields(self, row, announcement: dict):

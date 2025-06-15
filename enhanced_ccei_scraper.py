@@ -64,7 +64,20 @@ class EnhancedCCEIScraper(AjaxAPIScraper):
             logger.error(f"API 호출 실패: 페이지 {page_num}")
             return []
         
-        return self.parse_api_response(json_data, page_num)
+        announcements = self.parse_api_response(json_data, page_num)
+        
+        # CCEI API 특화: 빈 결과나 totalCnt를 확인하여 마지막 페이지 감지
+        if not announcements and page_num > 1:
+            result = json_data.get('result', {})
+            total_count = result.get('totalCnt', 0)
+            current_count = len(result.get('list', []))
+            
+            if total_count == 0 or current_count == 0:
+                logger.info(f"CCEI API 페이지 {page_num}: 총 {total_count}개, 현재 페이지 {current_count}개 - 마지막 페이지")
+            else:
+                logger.info(f"CCEI API 페이지 {page_num}: 공고가 없어 마지막 페이지로 판단됩니다")
+        
+        return announcements
         
     def parse_api_response(self, json_data: dict, page_num: int) -> list:
         """API 응답 파싱"""

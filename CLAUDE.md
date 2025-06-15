@@ -258,6 +258,281 @@ class NewSiteScraper(BaseScraper):
    - `chardet` 라이브러리로 인코딩 자동 감지
    - 다양한 인코딩 조합 시도
 
+### 8. Enhanced 스크래퍼 개발 가이드라인
+
+#### 8.1 표준화된 개발 규칙
+
+새로운 Enhanced 스크래퍼 개발 시 반드시 준수해야 할 표준 규칙:
+
+**출력 디렉토리 규칙**:
+- 테스트 시 항상 `output/{사이트명}` 형식 사용
+- 예: `output/kca`, `output/keit`, `output/djbea`
+- 기존 `output_사이트명` 형식은 사용 금지
+
+**테스트 페이지 수**:
+- 모든 테스트는 기본적으로 **3페이지**까지 실행
+- `test_enhanced_{사이트명}.py`의 기본값을 3으로 설정
+
+**첨부파일 검증 필수**:
+- 테스트 완료 후 첨부파일 다운로드 상태 반드시 확인
+- 파일 크기, 한글 파일명, 다운로드 성공 여부 검증
+- 첨부파일이 없는 공고와 있는 공고 모두 정상 처리 확인
+
+**개발 인사이트 문서**:
+- 모든 사이트는 `{사이트명}_code.txt` 형식으로 인사이트 저장
+- 예: `kca_code.txt`, `keit_code.txt`, `djbea_code.txt`
+- 사이트 특성, 기술적 해결책, 재사용 패턴 등 포함
+
+**테스트 함수 기본값 설정**:
+```python
+def test_site_scraper(pages=3):  # 기본값을 3으로 설정
+    output_dir = "output/사이트명"  # 표준 출력 디렉토리
+    # 첨부파일 검증 로직 포함 필수
+```
+
+#### 8.2 Enhanced 아키텍처 개요
+
+Enhanced 스크래퍼는 기존 BaseScraper에서 발전된 형태로, 다음과 같은 핵심 개선사항을 제공합니다:
+
+1. **StandardTableScraper 상속**: 공통 기능 재사용
+2. **중복 검사 자동화**: 해시 기반 제목 중복 감지  
+3. **향상된 로깅**: 구조화된 로그 시스템
+4. **Fallback 메커니즘**: 설정 없이도 동작하는 기본 구현
+5. **파일명 인코딩 개선**: 다단계 인코딩 복구
+
+#### 8.2 클래스 구조 패턴
+
+```python
+from enhanced_base_scraper import StandardTableScraper
+
+class EnhancedSiteScraper(StandardTableScraper):
+    """사이트명 전용 스크래퍼 - 향상된 버전"""
+    
+    def __init__(self):
+        super().__init__()
+        # 하드코딩된 설정들 (설정 파일로 관리되지만 fallback용)
+        self.base_url = "https://example.com"
+        self.list_url = "https://example.com/board/list"
+        
+        # 사이트 특화 설정
+        self.verify_ssl = True/False  # SSL 인증서 정책
+        self.default_encoding = 'utf-8'  # 또는 'euc-kr'
+    
+    def get_list_url(self, page_num: int) -> str:
+        """페이지별 URL 생성 - 설정 주입과 Fallback 패턴"""
+        # 설정이 있으면 부모 클래스의 표준 구현 사용
+        if self.config and self.config.pagination:
+            return super().get_list_url(page_num)
+        
+        # Fallback: 사이트 특화 로직
+        return f"{self.list_url}?page={page_num}"
+    
+    def parse_list_page(self, html_content: str) -> list:
+        """목록 페이지 파싱 - 설정 주입과 Fallback 패턴"""
+        # 설정 기반 파싱이 가능하면 사용
+        if self.config and self.config.selectors:
+            return super().parse_list_page(html_content)
+        
+        # Fallback: 사이트 특화 로직
+        return self._parse_list_fallback(html_content)
+
+# 하위 호환성을 위한 별칭
+SiteScraper = EnhancedSiteScraper
+```
+
+#### 8.3 중복 검사 시스템
+
+Enhanced 스크래퍼는 자동 중복 검사 기능을 제공합니다:
+
+```python
+# 자동으로 수행되는 중복 검사
+def filter_new_announcements(self, announcements: List[Dict[str, Any]]) -> tuple:
+    """새로운 공고만 필터링 - 중복 임계값 체크 포함"""
+    new_announcements = []
+    duplicate_count = 0
+    
+    for ann in announcements:
+        title = ann.get('title', '')
+        if not self.is_title_processed(title):
+            new_announcements.append(ann)
+            duplicate_count = 0  # 리셋
+        else:
+            duplicate_count += 1
+            # 연속 3개 중복 시 조기 종료
+            if duplicate_count >= self.duplicate_threshold:
+                return new_announcements, True
+    
+    return new_announcements, False
+```
+
+**특징**:
+- MD5 해시 기반 제목 정규화 및 중복 검사
+- `processed_titles_사이트명.json` 파일로 상태 관리
+- 연속 3개 중복 발견 시 자동 조기 종료
+- 제목 정규화: 공백, 특수문자, 대소문자 통일
+
+#### 8.4 파일명 인코딩 개선
+
+Enhanced 스크래퍼는 다단계 인코딩 복구를 지원합니다:
+
+```python
+def _extract_filename(self, response: requests.Response, default_path: str) -> str:
+    """향상된 파일명 추출 - 다단계 인코딩 처리"""
+    content_disposition = response.headers.get('content-disposition', '')
+    
+    # RFC 5987 형식 처리 (filename*=UTF-8''%ED%95%9C%EA%B8%80.hwp)
+    rfc5987_match = re.search(r"filename\*=([^']*)'([^']*)'(.+)", content_disposition)
+    if rfc5987_match:
+        encoding, lang, filename = rfc5987_match.groups()
+        try:
+            filename = unquote(filename)
+            decoded = filename.encode('latin-1').decode(encoding or 'utf-8')
+            return os.path.join(save_dir, self.sanitize_filename(decoded))
+        except:
+            pass
+    
+    # 다양한 인코딩 시도: UTF-8, EUC-KR, CP949
+    for encoding in ['utf-8', 'euc-kr', 'cp949']:
+        try:
+            if encoding == 'utf-8':
+                decoded = filename.encode('latin-1').decode('utf-8')
+            else:
+                decoded = filename.encode('latin-1').decode(encoding)
+            
+            if decoded and not decoded.isspace():
+                clean_filename = self.sanitize_filename(decoded.replace('+', ' '))
+                return os.path.join(save_dir, clean_filename)
+        except:
+            continue
+```
+
+#### 8.5 향상된 로깅 시스템
+
+구조화된 로깅으로 디버깅과 모니터링을 개선합니다:
+
+```python
+# 정보성 로그 (진행상황)
+logger.info(f"테이블에서 {len(tbody.find_all('tr'))}개 행 발견")
+logger.info(f"{len(announcements)}개 공고 파싱 완료")
+logger.info(f"다운로드 완료: {save_path} ({file_size:,} bytes)")
+
+# 디버그 로그 (상세 정보)
+logger.debug(f"본문을 {selector} 선택자로 찾음")
+logger.debug(f"JavaScript 파일 다운로드 URL 생성: {file_url}")
+
+# 경고 로그 (주의사항)
+logger.warning(f"basic_table 클래스를 가진 테이블을 찾을 수 없습니다")
+
+# 오류 로그 (실패 원인)
+logger.error(f"행 파싱 중 오류: {e}")
+logger.error(f"파일 다운로드 실패 {url}: {e}")
+```
+
+#### 8.6 Fallback 메커니즘 패턴
+
+Enhanced 스크래퍼는 설정 없이도 동작하는 Fallback 패턴을 구현합니다:
+
+```python
+def parse_list_page(self, html_content: str) -> list:
+    """목록 페이지 파싱"""
+    # 1단계: 설정 기반 파싱 시도
+    if self.config and self.config.selectors:
+        return super().parse_list_page(html_content)
+    
+    # 2단계: Fallback - 사이트 특화 로직
+    return self._parse_list_fallback(html_content)
+
+def _parse_list_fallback(self, html_content: str) -> list:
+    """사이트별 특화된 파싱 로직"""
+    # 여러 선택자를 순차적으로 시도
+    for selector in ['.basic_table', '.board_table', 'table']:
+        table = soup.find('table', class_=selector)
+        if table:
+            break
+    
+    # 본문 추출도 다단계 시도
+    for selector in ['.table_con', '.view_con', '.board_view']:
+        content_area = soup.select_one(selector)
+        if content_area:
+            break
+```
+
+#### 8.7 사이트별 특화 처리 예시
+
+**GSIF (Base64 인코딩 파라미터)**:
+```python
+def get_list_url(self, page_num: int) -> str:
+    if page_num == 1:
+        return self.list_url
+    else:
+        start_page = (page_num - 1) * 15
+        params = f"startPage={start_page}&listNo=&table=cs_bbs_data..."
+        encoded = base64.b64encode(params.encode('utf-8')).decode('utf-8')
+        return f"{self.base_url}/gsipa/bbs_list.do?bbs_data={encoded}||"
+```
+
+**JBF (JavaScript 파일 다운로드)**:
+```python
+def _extract_attachments(self, soup: BeautifulSoup) -> list:
+    # JavaScript 함수에서 파일 다운로드 파라미터 추출
+    # 예: fn_fileDown('파일ID')
+    match = re.search(r"fn_fileDown\\('([^']+)'\\)", onclick)
+    if match:
+        file_id = match.group(1)
+        file_url = f"{self.base_url}/main/fileDown.action?file_id={file_id}"
+```
+
+#### 8.8 테스트 및 검증 패턴
+
+Enhanced 스크래퍼의 표준 테스트 방법:
+
+```python
+def verify_results(output_dir):
+    """결과 검증 - 표준 패턴"""
+    # 1. 원본 URL 포함 확인
+    if '**원본 URL**:' in content and 'site_domain' in content:
+        url_check_passed += 1
+    
+    # 2. 한글 파일명 확인
+    has_korean = any(ord(char) >= 0xAC00 and ord(char) <= 0xD7A3 for char in filename)
+    
+    # 3. 파일 크기 확인
+    file_size = os.path.getsize(att_path)
+    
+    # 4. 성공률 계산
+    success_rate = (successful_items / total_items) * 100
+```
+
+#### 8.9 성능 최적화 패턴
+
+**스트리밍 다운로드**:
+```python
+def download_file(self, url: str, save_path: str) -> bool:
+    response = self.session.get(url, stream=True, verify=self.verify_ssl)
+    with open(save_path, 'wb') as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:
+                f.write(chunk)
+```
+
+**세션 재사용**:
+```python
+self.session = requests.Session()
+self.session.headers.update(self.headers)
+# 모든 요청에서 세션 재사용으로 성능 개선
+```
+
+#### 8.10 Enhanced 스크래퍼 장점 요약
+
+1. **개발 효율성**: 공통 기능 재사용으로 개발 시간 단축
+2. **안정성**: 중복 검사와 조기 종료로 안정적인 실행
+3. **디버깅**: 구조화된 로깅으로 문제 진단 용이
+4. **호환성**: 기존 코드와 하위 호환성 유지
+5. **확장성**: 설정 주입으로 향후 YAML 설정 지원 준비
+6. **복원력**: 다단계 Fallback으로 파싱 실패 최소화
+7. **인코딩**: 한글 파일명 처리 개선
+8. **성능**: 스트리밍 다운로드와 세션 재사용
+
 
 # pip install  대신에 uv add를 사용할 것.
 

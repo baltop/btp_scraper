@@ -37,7 +37,7 @@ from djbea_scraper import DJBEAScraper
 from mire_scraper import MIREScraper
 from dcb_scraper import DCBScraper
 from cci_scraper import CCIScraper
-from gib_scraper import GIBScraper
+from enhanced_gib_scraper import EnhancedGIBScraper
 from gbtp_scraper import GBTPScraper
 from gbtp_scraper_playwright import GBTPPlaywrightScraper
 from site_scrapers import (
@@ -324,7 +324,7 @@ def main():
             os.makedirs(output_dir, exist_ok=True)
             
             try:
-                scraper = GIBScraper()
+                scraper = EnhancedGIBScraper()
                 scraper.scrape_pages(max_pages=args.pages, output_base=output_dir)
                 
                 print(f"\n경북바이오산업연구원 수집이 완료되었습니다.")
