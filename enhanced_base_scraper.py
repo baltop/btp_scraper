@@ -350,7 +350,7 @@ class EnhancedBaseScraper(ABC):
                 new_announcements.append(ann)
             else:
                 duplicate_count += 1
-                logger.debug(f"이미 처리된 공고 스킵: {title[:150]}...")
+                logger.debug(f"이미 처리된 공고 스킵: {title[:200]}...")
                 
                 # 중복 임계값 도달시 조기 종료 신호
                 if duplicate_count >= self.duplicate_threshold:
@@ -367,7 +367,7 @@ class EnhancedBaseScraper(ABC):
         logger.info(f"공고 처리 중 {index}: {announcement['title']}")
         
         # 폴더 생성 - 원래 방식으로 복원 (번호 + 제목)
-        folder_title = self.sanitize_filename(announcement['title'])[:150]
+        folder_title = self.sanitize_filename(announcement['title'])[:200]
         folder_name = f"{index:03d}_{folder_title}"
         folder_path = os.path.join(output_base, folder_name)
         os.makedirs(folder_path, exist_ok=True)
@@ -380,7 +380,11 @@ class EnhancedBaseScraper(ABC):
         
         # 상세 내용 파싱
         try:
-            detail = self.parse_detail_page(response.text)
+            # URL을 함께 전달 (URL이 필요한 특수 사이트들을 위해)
+            if hasattr(self, 'parse_detail_page') and 'url' in self.parse_detail_page.__code__.co_varnames:
+                detail = self.parse_detail_page(response.text, announcement['url'])
+            else:
+                detail = self.parse_detail_page(response.text)
             logger.info(f"상세 페이지 파싱 완료 - 내용길이: {len(detail['content'])}, 첨부파일: {len(detail['attachments'])}")
         except Exception as e:
             logger.error(f"상세 페이지 파싱 실패: {e}")

@@ -1,18 +1,25 @@
-# Enhanced KCA 스크래퍼 개발 인사이트 및 코드 분석
+# KCA 사이트 스크래퍼 개발 인사이트
 
-## 프로젝트 개요
-- **사이트**: 한국방송통신전파진흥원(KCA) 공지사항
-- **URL**: https://www.kca.kr/boardList.do?boardId=NOTICE&pageId=www47
-- **개발 완료일**: 2025-06-13
-- **성공률**: 100% (공고 수집, 본문 추출)
+## 사이트 정보
+- **사이트명**: 한국방송통신전파진흥원 (KCA)
+- **URL**: https://pms.kca.kr:4433/board/boardList.do?sysType=KCA&bbsTc=BBS0001
+- **사이트 코드**: kca
+- **개발일**: 2025-06-19
 
-## 1. 사이트 특성 분석
+## 사이트 특성 분석
 
-### 1.1 표준적인 게시판 구조
-- **장점**: 일반적인 HTML 테이블/리스트 기반 게시판
-- **URL 패턴**: `boardView.do?pageId=www47&boardId=NOTICE&seq={게시글번호}&movePage={페이지번호}`
-- **페이지네이션**: `movePage` 파라미터 사용
-- **특징**: JavaScript 없이 직접 링크 방식으로 접근 가능
+### 1. 기술적 특징
+- **프레임워크**: 비표준 포트 4433을 사용하는 HTTPS 기반 정부기관 웹사이트
+- **인코딩**: UTF-8 (한글 처리 완벽)
+- **SSL**: 포트 4433으로 인한 인증서 문제 (verify_ssl=False 필요)
+- **보안**: CSRF 토큰 기반 보안 시스템
+- **네비게이션**: JavaScript 기반 동적 페이지 전환 (btnBoardView)
+
+### 2. 페이지 구조
+- **목록 페이지**: JavaScript btnBoardView 링크 기반
+- **페이지네이션**: GET 파라미터 방식 (?pageNumber=N)
+- **상세 페이지**: POST 요청 기반 접근 (CSRF 토큰 필요)
+- **첨부파일**: iframe 기반 시스템 및 다양한 다운로드 패턴
 
 ### 1.2 메타데이터 풍부함
 - **분류**: 방송통신진흥, 빛마루방송지원센터, 전파진흥, 전파검사, 기술자격, ICT기금관리, 공통

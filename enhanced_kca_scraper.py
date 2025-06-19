@@ -1,48 +1,54 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 """
-한국방송통신전파진흥원(KCA) Enhanced 스크래퍼
-사이트: https://www.kca.kr/boardList.do?boardId=NOTICE&pageId=www47
+KCA (한국방송통신전파진흥원) 스크래퍼 - 향상된 버전
+
+사이트: https://pms.kca.kr:4433/board/boardList.do?sysType=KCA&bbsTc=BBS0001
+특징: HTTPS 포트 4433, CSRF 토큰, POST 기반 상세 페이지, iframe 첨부파일
 """
 
-import requests
-from bs4 import BeautifulSoup
-import os
-import time
-import html2text
-from urllib.parse import urljoin, parse_qs, urlparse
 import re
-import json
+import os
 import logging
+from typing import List, Dict, Any
+from urllib.parse import urljoin, parse_qs, urlparse
+from bs4 import BeautifulSoup
+
 from enhanced_base_scraper import StandardTableScraper
-from typing import Dict, List, Any
 
 logger = logging.getLogger(__name__)
 
 class EnhancedKCAScraper(StandardTableScraper):
-    """한국방송통신전파진흥원(KCA) 전용 스크래퍼 - 향상된 버전"""
+    """KCA 전용 스크래퍼 - 향상된 버전"""
     
     def __init__(self):
         super().__init__()
-        # 하드코딩된 설정들 (설정 파일로 관리되지만 fallback용)
-        self.base_url = "https://www.kca.kr"
-        self.list_url = "https://www.kca.kr/boardList.do?boardId=NOTICE&pageId=www47"
+        # 기본 설정
+        self.base_url = "https://pms.kca.kr:4433"
+        self.list_url = "https://pms.kca.kr:4433/board/boardList.do?sysType=KCA&bbsTc=BBS0001"
         
-        # 사이트 특화 설정
-        self.verify_ssl = True
+        # 사이트별 특화 설정
+        self.verify_ssl = False  # 특수 포트로 인한 SSL 검증 비활성화
         self.default_encoding = 'utf-8'
+        self.timeout = 30
+        self.delay_between_requests = 2  # CSRF 토큰 처리를 위해 여유있게 설정
         
-        # 헤더 설정
+        # KCA 특화 설정
         self.headers.update({
-            'Referer': self.base_url,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
             'Accept-Language': 'ko-KR,ko;q=0.8,en-US;q=0.5,en;q=0.3',
+            'Accept-Encoding': 'gzip, deflate',
             'Connection': 'keep-alive',
             'Upgrade-Insecure-Requests': '1'
         })
-        self.session.headers.update(self.headers)
+        
+        # CSRF 토큰 저장
+        self.csrf_token = None
+        
+        logger.info("KCA 스크래퍼 초기화 완료")
     
     def get_list_url(self, page_num: int) -> str:
-        """페이지별 URL 생성 - 설정 주입과 Fallback 패턴"""
+        """페이지별 URL 생성"""
         # 설정이 있으면 부모 클래스의 표준 구현 사용
         if self.config and self.config.pagination:
             return super().get_list_url(page_num)
@@ -51,11 +57,10 @@ class EnhancedKCAScraper(StandardTableScraper):
         if page_num == 1:
             return self.list_url
         else:
-            # movePage 파라미터로 페이지네이션
-            return f"{self.list_url}&movePage={page_num}"
+            return f"{self.list_url}&pageNumber={page_num}"
     
     def parse_list_page(self, html_content: str) -> List[Dict[str, Any]]:
-        """목록 페이지 파싱 - 설정 주입과 Fallback 패턴"""
+        """목록 페이지 파싱"""
         # 설정 기반 파싱이 가능하면 사용
         if self.config and self.config.selectors:
             return super().parse_list_page(html_content)
@@ -64,247 +69,176 @@ class EnhancedKCAScraper(StandardTableScraper):
         return self._parse_list_fallback(html_content)
     
     def _parse_list_fallback(self, html_content: str) -> List[Dict[str, Any]]:
-        """KCA 사이트 특화된 파싱 로직"""
+        """KCA 공고 목록 파싱 (btnBoardView 링크 기반)"""
         soup = BeautifulSoup(html_content, 'html.parser')
         announcements = []
         
-        logger.info("KCA 목록 페이지 파싱 시작")
-        
-        # KCA의 게시판 구조는 일반적인 테이블 형태
-        # boardView.do 링크를 찾아서 공고 목록 추출
-        
-        # 먼저 전체 게시글 수 확인
-        total_info = soup.find(string=re.compile(r'전체게시글\s*:\s*\d+'))
-        if total_info:
-            logger.info(f"페이지 정보: {total_info.strip()}")
-        
-        # 테이블 행들 찾기 - 실제 공고 데이터가 있는 행들
-        rows = soup.find_all('div', class_=lambda x: x and 'boardListItem' in str(x)) or \
-               soup.find_all('li', class_=lambda x: x and 'item' in str(x)) or \
-               soup.select('div[class*="row"], tr')
-        
-        # boardView.do 링크가 있는 요소들을 직접 찾기
-        board_links = soup.find_all('a', href=lambda x: x and 'boardView.do' in x)
-        
-        if board_links:
-            for link in board_links:
+        try:
+            # CSRF 토큰 추출 및 저장
+            csrf_input = soup.find('input', {'name': '_csrf'})
+            if csrf_input:
+                self.csrf_token = csrf_input.get('value')
+                logger.debug(f"CSRF 토큰 추출: {self.csrf_token[:20]}...")
+            
+            # btnBoardView 링크들 찾기
+            view_links = soup.find_all('a', id=re.compile(r'btnBoardView\d+'))
+            logger.info(f"btnBoardView 링크 {len(view_links)}개 발견")
+            
+            for i, link in enumerate(view_links):
                 try:
-                    # 제목 추출
-                    title = link.get_text(strip=True)
-                    if not title or len(title) < 5:
+                    # 링크에서 데이터 속성 추출
+                    sys_type = link.get('data-sys-type', 'KCA')
+                    bbs_tc = link.get('data-bbs-tc', 'BBS0001')
+                    bbs_id = link.get('data-bbs-id')
+                    
+                    if not bbs_id:
+                        logger.debug(f"링크 {i+1}: bbs_id가 없음")
                         continue
                     
-                    # URL 구성
-                    href = link.get('href')
-                    detail_url = urljoin(self.base_url, href)
+                    # 제목 추출 (링크 텍스트 또는 근처 텍스트)
+                    title = link.get_text(strip=True)
                     
-                    # URL에서 seq 파라미터 추출 (게시글 번호)
-                    parsed_url = urlparse(href)
-                    query_params = parse_qs(parsed_url.query)
-                    seq = query_params.get('seq', [''])[0]
-                    move_page = query_params.get('movePage', ['1'])[0]
+                    # 제목이 비어있으면 주변에서 찾기
+                    if not title or title in ['상세보기', '보기', '클릭']:
+                        # 같은 행(tr)에서 제목 찾기
+                        parent_row = link.find_parent('tr')
+                        if parent_row:
+                            cells = parent_row.find_all('td')
+                            for cell in cells:
+                                cell_text = cell.get_text(strip=True)
+                                if cell_text and len(cell_text) > 5 and cell_text not in ['상세보기', '보기']:
+                                    title = cell_text
+                                    break
                     
-                    # 부모 요소들에서 추가 정보 추출
-                    parent = link.parent
-                    root_parent = self._find_list_item_root(link)
+                    if not title:
+                        logger.debug(f"링크 {i+1}: 제목을 찾을 수 없음")
+                        continue
                     
-                    # 분류, 작성자, 작성일, 조회수 등 메타 정보 추출
-                    category = self._extract_category(root_parent)
-                    writer = self._extract_writer(root_parent)
-                    date = self._extract_date(root_parent)
-                    views = self._extract_views(root_parent)
-                    number = self._extract_number(root_parent)
-                    has_file = self._extract_file_info(root_parent)
+                    # 작성일 추출 (같은 행에서)
+                    date = ""
+                    parent_row = link.find_parent('tr')
+                    if parent_row:
+                        cells = parent_row.find_all('td')
+                        for cell in cells:
+                            cell_text = cell.get_text(strip=True)
+                            # 날짜 패턴 찾기 (YYYY-MM-DD 형식)
+                            if re.match(r'\d{4}-\d{2}-\d{2}', cell_text):
+                                date = cell_text
+                                break
                     
                     announcement = {
                         'title': title,
-                        'url': detail_url,
-                        'category': category,
-                        'writer': writer,
+                        'sys_type': sys_type,
+                        'bbs_tc': bbs_tc,
+                        'bbs_id': bbs_id,
                         'date': date,
-                        'views': views,
-                        'number': number,
-                        'has_file': has_file,
-                        'seq': seq,
-                        'move_page': move_page
+                        'url': f"{self.base_url}/board/boardView.do"  # POST 요청용 URL
                     }
                     
                     announcements.append(announcement)
-                    logger.debug(f"공고 파싱: {title[:50]}... - 번호: {number}")
+                    logger.debug(f"공고 파싱 완료: {title[:50]}...")
                     
                 except Exception as e:
-                    logger.error(f"공고 링크 파싱 중 오류: {e}")
+                    logger.warning(f"링크 {i+1} 파싱 중 오류: {e}")
                     continue
+                    
+        except Exception as e:
+            logger.error(f"목록 페이지 파싱 중 오류: {e}")
         
-        logger.info(f"KCA 목록에서 {len(announcements)}개 공고 파싱 완료")
+        logger.info(f"{len(announcements)}개 공고 파싱 완료")
         return announcements
-    
-    def _find_list_item_root(self, element) -> BeautifulSoup:
-        """링크 요소에서 목록 아이템의 루트 요소 찾기"""
-        current = element
-        depth = 0
-        
-        while current and current.parent and depth < 10:
-            # div나 li 태그이면서 형제가 여러 개 있는 경우 (목록 아이템일 가능성)
-            if current.name in ['div', 'li', 'tr']:
-                siblings = current.find_next_siblings() + current.find_previous_siblings()
-                if len(siblings) > 0:
-                    return current
-            
-            current = current.parent
-            depth += 1
-        
-        return element.parent if element.parent else element
-    
-    def _extract_category(self, root_element) -> str:
-        """분류 정보 추출"""
-        if not root_element:
-            return ""
-        
-        # 일반적인 분류 패턴들
-        category_patterns = [
-            '방송통신진흥', '빛마루방송지원센터', '전파진흥', '전파검사', 
-            '기술자격', 'ICT기금관리', '공통'
-        ]
-        
-        text = root_element.get_text()
-        for pattern in category_patterns:
-            if pattern in text:
-                return pattern
-        
-        return ""
-    
-    def _extract_writer(self, root_element) -> str:
-        """작성자 정보 추출"""
-        if not root_element:
-            return ""
-        
-        text = root_element.get_text()
-        
-        # 팀명이 포함된 패턴 찾기
-        writer_patterns = [
-            r'([가-힣]+팀)', r'([가-힣]+센터)', r'([가-힣]+부서)', r'([가-힣]+과)'
-        ]
-        
-        for pattern in writer_patterns:
-            match = re.search(pattern, text)
-            if match:
-                return match.group(1)
-        
-        return ""
-    
-    def _extract_date(self, root_element) -> str:
-        """작성일 추출"""
-        if not root_element:
-            return ""
-        
-        text = root_element.get_text()
-        
-        # 날짜 패턴 찾기 (YYYY-MM-DD 형식)
-        date_match = re.search(r'(\d{4}-\d{2}-\d{2})', text)
-        if date_match:
-            return date_match.group(1)
-        
-        return ""
-    
-    def _extract_views(self, root_element) -> str:
-        """조회수 추출"""
-        if not root_element:
-            return ""
-        
-        text = root_element.get_text()
-        
-        # 숫자만 있는 패턴 (조회수일 가능성)
-        numbers = re.findall(r'\b(\d{1,6})\b', text)
-        
-        # 가장 마지막 숫자가 조회수일 가능성이 높음
-        if numbers:
-            # 4자리 이하의 숫자 중 가장 마지막 것
-            for num in reversed(numbers):
-                if len(num) <= 6 and int(num) > 0:
-                    return num
-        
-        return ""
-    
-    def _extract_number(self, root_element) -> str:
-        """게시글 번호 추출"""
-        if not root_element:
-            return ""
-        
-        text = root_element.get_text()
-        
-        # 게시글 번호 패턴 (보통 4자리 숫자)
-        number_match = re.search(r'\b(\d{4})\b', text)
-        if number_match:
-            return number_match.group(1)
-        
-        return ""
-    
-    def _extract_file_info(self, root_element) -> bool:
-        """첨부파일 존재 여부 확인"""
-        if not root_element:
-            return False
-        
-        # 파일 아이콘이나 첨부파일 관련 요소 찾기
-        file_elements = root_element.find_all(['img', 'span'], class_=lambda x: x and 'file' in str(x).lower())
-        
-        # fileDownload.do 링크가 있는지 확인
-        file_links = root_element.find_all('a', href=lambda x: x and 'fileDownload.do' in x)
-        
-        return len(file_elements) > 0 or len(file_links) > 0
     
     def parse_detail_page(self, html_content: str) -> Dict[str, Any]:
         """상세 페이지 파싱"""
+        # 설정 기반 파싱이 가능하면 사용
+        if self.config and self.config.selectors:
+            return super().parse_detail_page(html_content)
+        
+        # Fallback: KCA 특화 로직
+        return self._parse_detail_fallback(html_content)
+    
+    def fetch_detail_page(self, announcement: Dict[str, Any]) -> str:
+        """KCA 상세 페이지 요청 (POST 방식)"""
+        try:
+            # POST 데이터 준비
+            post_data = {
+                'sysType': announcement.get('sys_type', 'KCA'),
+                'bbsTc': announcement.get('bbs_tc', 'BBS0001'),
+                'bbsId': announcement.get('bbs_id'),
+                '_csrf': self.csrf_token or ''
+            }
+            
+            logger.debug(f"POST 요청: {post_data}")
+            
+            response = self.session.post(
+                announcement['url'],
+                data=post_data,
+                verify=self.verify_ssl,
+                timeout=self.timeout
+            )
+            response.raise_for_status()
+            
+            return response.text
+            
+        except Exception as e:
+            logger.error(f"상세 페이지 요청 실패: {e}")
+            return ""
+    
+    def _parse_detail_fallback(self, html_content: str) -> Dict[str, Any]:
+        """KCA 상세 페이지 특화 파싱"""
         soup = BeautifulSoup(html_content, 'html.parser')
         
-        # 본문 내용 추출 - 여러 선택자 시도
-        content = ""
+        # 본문 추출을 위한 다양한 선택자 시도
         content_selectors = [
-            'div[class*="boardContent"]',
+            'h2',  # 제목
+            '.board-content',
+            '.content-area',
+            '.view-content',
             'div[class*="content"]',
-            'div[class*="view"]',
-            '.board_view',
-            '.view_content',
-            'div.text'
+            'div[class*="view"]'
         ]
         
-        for selector in content_selectors:
-            content_area = soup.select_one(selector)
-            if content_area:
-                # 네비게이션, 버튼 등 제거
-                for unwanted in content_area.find_all(['script', 'style', 'button', 'nav']):
-                    unwanted.decompose()
+        content_parts = []
+        
+        # 제목 추출
+        title_elem = soup.find('h2')
+        if title_elem:
+            content_parts.append(f"# {title_elem.get_text(strip=True)}")
+        
+        # 본문 내용 추출
+        for selector in content_selectors[1:]:  # 제목 제외
+            content_elem = soup.select_one(selector)
+            if content_elem:
+                text = content_elem.get_text(separator='\n', strip=True)
+                if text and len(text) > 50:  # 충분한 내용이 있는 경우
+                    content_parts.append(text)
+                    logger.debug(f"본문을 {selector} 선택자로 찾음")
+                    break
+        
+        # 본문을 찾지 못한 경우 전체 body에서 추출
+        if len(content_parts) <= 1:  # 제목만 있는 경우
+            body = soup.find('body')
+            if body:
+                # 스크립트, 스타일 태그 제거
+                for script in body(["script", "style"]):
+                    script.decompose()
                 
-                # HTML을 마크다운으로 변환
-                content = self.h.handle(str(content_area))
-                logger.debug(f"본문을 {selector} 선택자로 찾음")
-                break
+                text = body.get_text(separator='\n', strip=True)
+                lines = [line.strip() for line in text.split('\n') if line.strip()]
+                
+                # 중복 제거 및 필터링
+                filtered_lines = []
+                for line in lines:
+                    if len(line) > 10 and line not in filtered_lines[-5:]:  # 최근 5줄과 중복 체크
+                        filtered_lines.append(line)
+                
+                content_parts.extend(filtered_lines[:50])  # 최대 50줄까지
+                logger.warning("본문 영역을 찾지 못해 전체 페이지 텍스트 사용")
         
-        # 기본 추출에 실패한 경우 본문이 있을만한 div 찾기
-        if not content or len(content.strip()) < 100:
-            logger.warning("본문 추출에 실패했습니다. 대체 방법을 시도합니다.")
-            
-            # 텍스트가 많은 div 찾기
-            all_divs = soup.find_all('div')
-            best_div = None
-            max_text_length = 0
-            
-            for div in all_divs:
-                div_text = div.get_text(strip=True)
-                if len(div_text) > max_text_length and len(div_text) > 100:
-                    # 네비게이션이나 메뉴가 아닌지 확인
-                    if not any(keyword in div_text.lower() for keyword in ['menu', 'nav', 'footer', 'header', 'login']):
-                        max_text_length = len(div_text)
-                        best_div = div
-            
-            if best_div:
-                content = self.h.handle(str(best_div))
-                logger.info(f"대체 방법으로 본문 추출 완료 (길이: {len(content)})")
+        content = '\n\n'.join(content_parts)
         
-        # 첨부파일 정보 추출
+        # 첨부파일 추출
         attachments = self._extract_attachments(soup)
-        
-        logger.info(f"상세 페이지 파싱 완료 - 내용길이: {len(content)}, 첨부파일: {len(attachments)}개")
         
         return {
             'content': content,
@@ -312,99 +246,173 @@ class EnhancedKCAScraper(StandardTableScraper):
         }
     
     def _extract_attachments(self, soup: BeautifulSoup) -> List[Dict[str, Any]]:
-        """첨부파일 정보 추출"""
+        """첨부파일 링크 추출 (iframe 기반 시스템 고려)"""
         attachments = []
         
-        # KCA의 첨부파일 다운로드 링크 패턴: /fileDownload.do?action=fileDown&...
-        file_links = soup.find_all('a', href=lambda x: x and 'fileDownload.do' in x)
-        
-        for link in file_links:
-            try:
-                href = link.get('href', '')
-                if not href:
-                    continue
-                
-                # 파일명 추출
-                name = link.get_text(strip=True)
-                
-                # 압축 다운로드 링크 제외 (개별 파일만)
-                if 'zipFileDown' in href:
-                    continue
-                
-                # 파일명이 없으면 스킵
-                if not name or len(name) < 3:
-                    continue
-                
-                # 파일 URL 구성
-                file_url = urljoin(self.base_url, href)
-                
-                # 파일 크기 정보 추출 (있는 경우)
-                size_info = ""
-                download_count = ""
-                
-                # 부모 요소에서 파일 정보 찾기
-                parent = link.parent
-                if parent:
-                    parent_text = parent.get_text()
+        try:
+            # 1. 일반적인 첨부파일 링크 패턴
+            download_patterns = [
+                'a[href*="download"]',
+                'a[href*="file"]',
+                'a[href*="attach"]',
+                'button[onclick*="download"]',
+                'button[onclick*="file"]'
+            ]
+            
+            for pattern in download_patterns:
+                links = soup.select(pattern)
+                for link in links:
+                    href = link.get('href') or link.get('onclick', '')
+                    filename = link.get_text(strip=True)
                     
-                    # 크기 정보 추출
-                    size_match = re.search(r'\[size:\s*([^,\]]+)', parent_text)
-                    if size_match:
-                        size_info = size_match.group(1)
-                    
-                    # 다운로드 카운트 추출
-                    download_match = re.search(r'Download:\s*(\d+)', parent_text)
-                    if download_match:
-                        download_count = download_match.group(1)
-                
-                # next_sibling에서도 시도
-                try:
-                    next_sibling = link.next_sibling
-                    if next_sibling:
-                        # BeautifulSoup 요소나 문자열 모두 처리
-                        if hasattr(next_sibling, 'get_text'):
-                            sibling_text = next_sibling.get_text()
+                    if href and filename and len(filename) > 3:
+                        if href.startswith('/'):
+                            file_url = urljoin(self.base_url, href)
                         else:
-                            sibling_text = str(next_sibling)
+                            file_url = href
                         
-                        if not size_info:
-                            size_match = re.search(r'\[size:\s*([^,\]]+)', sibling_text)
-                            if size_match:
-                                size_info = size_match.group(1)
+                        attachments.append({
+                            'name': filename,
+                            'url': file_url
+                        })
+                        logger.debug(f"첨부파일 발견: {filename}")
+            
+            # 2. iframe 내 첨부파일 시스템 체크
+            iframes = soup.find_all('iframe')
+            for iframe in iframes:
+                iframe_src = iframe.get('src')
+                if iframe_src and ('file' in iframe_src.lower() or 'attach' in iframe_src.lower()):
+                    # iframe 내용을 별도로 요청하여 분석
+                    try:
+                        if iframe_src.startswith('/'):
+                            iframe_url = urljoin(self.base_url, iframe_src)
+                        else:
+                            iframe_url = iframe_src
                         
-                        if not download_count:
-                            download_match = re.search(r'Download:\s*(\d+)', sibling_text)
-                            if download_match:
-                                download_count = download_match.group(1)
-                except Exception as e:
-                    logger.debug(f"sibling 텍스트 처리 중 오류: {e}")
-                    pass
-                
-                attachment = {
-                    'name': name,
-                    'url': file_url,
-                    'size': size_info,
-                    'download_count': download_count
-                }
-                
-                attachments.append(attachment)
-                logger.debug(f"KCA 첨부파일 발견: {name}")
-                
-            except Exception as e:
-                logger.error(f"첨부파일 추출 중 오류: {e}")
-                continue
+                        iframe_response = self.session.get(iframe_url, verify=self.verify_ssl)
+                        iframe_soup = BeautifulSoup(iframe_response.text, 'html.parser')
+                        
+                        # iframe 내에서 다운로드 링크 찾기
+                        iframe_links = iframe_soup.find_all('a', href=True)
+                        for link in iframe_links:
+                            href = link.get('href')
+                            filename = link.get_text(strip=True)
+                            
+                            if filename and any(ext in filename.lower() for ext in ['.pdf', '.hwp', '.doc', '.xls', '.zip']):
+                                if href.startswith('/'):
+                                    file_url = urljoin(self.base_url, href)
+                                else:
+                                    file_url = href
+                                
+                                attachments.append({
+                                    'name': filename,
+                                    'url': file_url
+                                })
+                                logger.debug(f"iframe 첨부파일 발견: {filename}")
+                        
+                    except Exception as e:
+                        logger.debug(f"iframe 처리 중 오류: {e}")
+            
+        except Exception as e:
+            logger.error(f"첨부파일 추출 중 오류: {e}")
         
         # 중복 제거
         unique_attachments = []
-        seen_names = set()
+        seen = set()
         for att in attachments:
-            if att['name'] not in seen_names:
+            key = (att['name'], att['url'])
+            if key not in seen:
+                seen.add(key)
                 unique_attachments.append(att)
-                seen_names.add(att['name'])
         
-        logger.info(f"총 {len(unique_attachments)}개 첨부파일 발견")
+        logger.info(f"{len(unique_attachments)}개 첨부파일 발견")
         return unique_attachments
-
+    
+    def scrape_announcement(self, announcement: Dict[str, Any], output_dir: str) -> bool:
+        """개별 공고 스크래핑 (KCA 특화 버전)"""
+        try:
+            title = announcement.get('title', 'Unknown')
+            logger.info(f"공고 처리 중: {title}")
+            
+            # KCA 전용 상세 페이지 요청
+            html_content = self.fetch_detail_page(announcement)
+            if not html_content:
+                logger.error(f"상세 페이지 요청 실패: {title}")
+                return False
+            
+            # 상세 페이지 파싱
+            detail_data = self.parse_detail_page(html_content)
+            
+            if not detail_data:
+                logger.error(f"상세 페이지 파싱 실패: {title}")
+                return False
+            
+            content = detail_data.get('content', '')
+            attachments = detail_data.get('attachments', [])
+            
+            logger.info(f"상세 페이지 파싱 완료 - 내용길이: {len(content)}, 첨부파일: {len(attachments)}")
+            
+            # 파일 저장
+            safe_title = self.sanitize_filename(title)
+            announcement_dir = os.path.join(output_dir, safe_title)
+            os.makedirs(announcement_dir, exist_ok=True)
+            
+            # 내용 저장
+            content_file = os.path.join(announcement_dir, 'content.md')
+            
+            # 메타데이터 추가
+            full_content = f"# {title}\n\n"
+            if announcement.get('date'):
+                full_content += f"**작성일**: {announcement['date']}\n"
+            full_content += f"**원본 URL**: {announcement['url']}\n"
+            full_content += f"**게시글 ID**: {announcement.get('bbs_id', 'N/A')}\n\n"
+            full_content += "---\n"
+            full_content += content
+            
+            with open(content_file, 'w', encoding='utf-8') as f:
+                f.write(full_content)
+            
+            logger.info(f"내용 저장 완료: {content_file}")
+            
+            # 첨부파일 다운로드
+            if attachments:
+                attachments_dir = os.path.join(announcement_dir, 'attachments')
+                os.makedirs(attachments_dir, exist_ok=True)
+                
+                logger.info(f"{len(attachments)}개 첨부파일 다운로드 시작")
+                
+                for i, attachment in enumerate(attachments, 1):
+                    try:
+                        filename = attachment.get('name', f'attachment_{i}')
+                        file_url = attachment['url']
+                        
+                        logger.info(f"  첨부파일 {i}: {filename}")
+                        logger.info(f"파일 다운로드 시작: {file_url}")
+                        
+                        if self.download_file(file_url, attachments_dir, filename):
+                            logger.info(f"다운로드 완료: {filename}")
+                        else:
+                            logger.warning(f"다운로드 실패: {filename}")
+                            
+                    except Exception as e:
+                        logger.error(f"첨부파일 {i} 처리 중 오류: {e}")
+            else:
+                logger.info("첨부파일이 없습니다")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"공고 스크래핑 중 오류: {e}")
+            return False
 
 # 하위 호환성을 위한 별칭
 KCAScraper = EnhancedKCAScraper
+
+if __name__ == "__main__":
+    # 간단한 테스트
+    scraper = EnhancedKCAScraper()
+    print(f"KCA 스크래퍼 초기화 완료")
+    print(f"기본 URL: {scraper.list_url}")
+    print(f"1페이지 URL: {scraper.get_list_url(1)}")
+    print(f"2페이지 URL: {scraper.get_list_url(2)}")
+    print(f"SSL 검증: {scraper.verify_ssl}")  # False여야 함
