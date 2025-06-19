@@ -350,7 +350,7 @@ class EnhancedBaseScraper(ABC):
                 new_announcements.append(ann)
             else:
                 duplicate_count += 1
-                logger.debug(f"이미 처리된 공고 스킵: {title[:50]}...")
+                logger.debug(f"이미 처리된 공고 스킵: {title[:150]}...")
                 
                 # 중복 임계값 도달시 조기 종료 신호
                 if duplicate_count >= self.duplicate_threshold:
@@ -366,8 +366,8 @@ class EnhancedBaseScraper(ABC):
         """개별 공고 처리 - 향상된 버전"""
         logger.info(f"공고 처리 중 {index}: {announcement['title']}")
         
-        # 폴더 생성
-        folder_title = self.sanitize_filename(announcement['title'])[:50]
+        # 폴더 생성 - 원래 방식으로 복원 (번호 + 제목)
+        folder_title = self.sanitize_filename(announcement['title'])[:150]
         folder_name = f"{index:03d}_{folder_title}"
         folder_path = os.path.join(output_base, folder_name)
         os.makedirs(folder_path, exist_ok=True)

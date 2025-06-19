@@ -537,3 +537,425 @@ self.session.headers.update(self.headers)
 # pip install  대신에 uv add를 사용할 것.
 
 # robots.txt는 무시할 것.
+
+## 9. 새로운 사이트 추가 시 실전 개발 프로세스
+
+### 9.1 개발 단계별 체크리스트
+
+#### 1단계: 사이트 분석 및 기본 구조 파악
+```bash
+# Playwright로 사이트 구조 분석
+python -c "
+from playwright.sync_api import sync_playwright
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=False)
+    page = browser.new_page()
+    page.goto('사이트URL')
+    input('Press Enter after analysis...')
+    browser.close()
+"
+```
+
+**체크 포인트**:
+- [ ] 목록 페이지 테이블/리스트 구조 확인
+- [ ] 페이지네이션 방식 확인 (GET/POST/JavaScript)
+- [ ] 상세 페이지 링크 패턴 확인
+- [ ] 첨부파일 다운로드 링크 패턴 확인
+- [ ] SSL 인증서 상태 확인
+- [ ] 인코딩 방식 확인 (UTF-8/EUC-KR)
+
+#### 2단계: Enhanced 스크래퍼 개발
+```python
+# enhanced_{사이트명}_scraper.py 파일 생성
+from enhanced_base_scraper import StandardTableScraper
+
+class Enhanced{사이트명}Scraper(StandardTableScraper):
+    """사이트명 전용 스크래퍼 - 향상된 버전"""
+    
+    def __init__(self):
+        super().__init__()
+        # 기본 설정
+        self.base_url = "https://example.com"
+        self.list_url = "https://example.com/board/list"
+        
+        # 사이트별 특화 설정
+        self.verify_ssl = True/False
+        self.default_encoding = 'utf-8'/'euc-kr'
+        self.timeout = 30/60
+        self.delay_between_requests = 1/2
+```
+
+**필수 구현 메소드**:
+- [ ] `get_list_url()` - 페이지네이션 URL 생성
+- [ ] `parse_list_page()` - 목록 페이지 파싱
+- [ ] `parse_detail_page()` - 상세 페이지 파싱
+- [ ] `_extract_attachments()` - 첨부파일 추출
+- [ ] `download_file()` - 파일 다운로드 (필요시 오버라이드)
+
+#### 3단계: 테스트 스크립트 작성
+```python
+# test_enhanced_{사이트명}.py 파일 생성
+def test_{사이트명}_scraper(pages=3):  # 기본값 3페이지
+    """사이트명 스크래퍼 테스트"""
+    scraper = Enhanced{사이트명}Scraper()
+    output_dir = "output/{사이트명}"  # 표준 출력 디렉토리
+    os.makedirs(output_dir, exist_ok=True)
+    scraper.scrape_pages(max_pages=pages, output_base=output_dir)
+
+def verify_results(output_dir):
+    """결과 검증 - 첨부파일 검증 필수"""
+    # 1. 공고 수 확인
+    # 2. 첨부파일 다운로드 상태 확인
+    # 3. 한글 파일명 처리 확인
+    # 4. 원본 URL 포함 확인
+    # 5. 성공률 계산
+```
+
+#### 4단계: 단계별 테스트 실행
+```bash
+# 1. 단일 페이지 테스트
+python test_enhanced_{사이트명}.py --single
+
+# 2. 3페이지 테스트
+python test_enhanced_{사이트명}.py --pages 3
+
+# 3. 결과 확인
+ls -la output/{사이트명}/
+find output/{사이트명} -name "*.pdf" -o -name "*.hwp" | wc -l
+```
+
+#### 5단계: 개발 인사이트 문서 작성
+```bash
+# {사이트명}_code.txt 파일 생성
+```
+
+**문서 포함 내용**:
+- [ ] 사이트 특성 분석 (URL, 구조, 인코딩)
+- [ ] 기술적 구현 특징 (코드 예시 포함)
+- [ ] 주요 해결책 (인코딩, 파일다운로드, 특수 처리)
+- [ ] 테스트 결과 (성공률, 파일 통계)
+- [ ] 재사용 가능한 패턴
+- [ ] 특별한 기술적 도전과 해결책
+
+### 9.2 일반적인 개발 패턴별 대응책
+
+#### 표준 HTML 테이블 기반 사이트 (JBBA, BUSANIT 타입)
+```python
+def parse_list_page(self, html_content: str) -> List[Dict[str, Any]]:
+    soup = BeautifulSoup(html_content, 'html.parser')
+    table = soup.find('table')
+    tbody = table.find('tbody') or table
+    
+    for row in tbody.find_all('tr'):
+        cells = row.find_all('td')
+        if len(cells) < 3:  # 최소 필드 확인
+            continue
+        
+        # 제목 셀 (보통 두 번째)
+        title_cell = cells[1]
+        link_elem = title_cell.find('a')
+        
+        if link_elem:
+            title = link_elem.get_text(strip=True)
+            href = link_elem.get('href', '')
+            detail_url = urljoin(self.base_url, href)
+```
+
+**적용 사이트**: 대부분의 정부기관, 공공기관 게시판
+
+#### JavaScript 기반 동적 사이트 (KIDP, GSIF 타입)
+```python
+def get_list_url(self, page_num: int) -> str:
+    if page_num == 1:
+        return self.list_url
+    else:
+        # JavaScript 함수 파라미터 분석 후 URL 구성
+        params = self._build_page_params(page_num)
+        return f"{self.base_url}/api/list?{params}"
+
+def _extract_attachments(self, soup: BeautifulSoup) -> list:
+    # JavaScript 함수에서 파일 ID 추출
+    onclick_pattern = r"download\('([^']+)'\)"
+    for link in soup.find_all('a', onclick=re.compile(onclick_pattern)):
+        match = re.search(onclick_pattern, link.get('onclick', ''))
+        if match:
+            file_id = match.group(1)
+            file_url = f"{self.base_url}/download?id={file_id}"
+```
+
+**적용 사이트**: 최신 기술 스택을 사용하는 사이트
+
+#### AJAX/JSON API 기반 사이트 (CCEI 타입)
+```python
+def fetch_announcements_api(self, page_num: int) -> dict:
+    api_url = f"{self.base_url}/api/announcements"
+    payload = {
+        'page': page_num,
+        'size': 20,
+        'boardType': 'notice'
+    }
+    
+    response = self.session.post(api_url, json=payload)
+    return response.json()
+
+def parse_api_response(self, api_data: dict) -> list:
+    announcements = []
+    for item in api_data.get('data', []):
+        announcement = {
+            'title': item.get('title'),
+            'url': f"{self.base_url}/view/{item.get('id')}",
+            'attachments': item.get('files', [])  # API에 첨부파일 정보 포함
+        }
+        announcements.append(announcement)
+    return announcements
+```
+
+**적용 사이트**: 최신 웹 애플리케이션, SPA 기반 사이트
+
+### 9.3 한글 파일명 처리 표준 패턴
+
+#### 다단계 인코딩 처리 패턴
+```python
+def _extract_filename_from_response(self, response, default_path):
+    content_disposition = response.headers.get('Content-Disposition', '')
+    
+    if content_disposition:
+        # 1. RFC 5987 형식 우선 처리
+        rfc5987_match = re.search(r"filename\*=([^']*)'([^']*)'(.+)", content_disposition)
+        if rfc5987_match:
+            encoding, lang, filename = rfc5987_match.groups()
+            try:
+                filename = unquote(filename, encoding=encoding or 'utf-8')
+                return os.path.join(save_dir, self.sanitize_filename(filename))
+            except:
+                pass
+        
+        # 2. 일반 filename 파라미터 처리
+        filename_match = re.search(r'filename[^;=\n]*=([\'"]*)(.*?)\1', content_disposition)
+        if filename_match:
+            filename = filename_match.group(2)
+            
+            # 3. 다양한 인코딩 시도
+            for encoding in ['utf-8', 'euc-kr', 'cp949']:
+                try:
+                    if encoding == 'utf-8':
+                        decoded = filename.encode('latin-1').decode('utf-8')
+                    else:
+                        decoded = filename.encode('latin-1').decode(encoding)
+                    
+                    if decoded and not decoded.isspace():
+                        clean_filename = self.sanitize_filename(decoded.replace('+', ' '))
+                        return os.path.join(save_dir, clean_filename)
+                except:
+                    continue
+    
+    return default_path
+```
+
+### 9.4 성능 최적화 및 안정성 패턴
+
+#### 네트워크 안정성 강화
+```python
+def robust_request(self, url: str, max_retries: int = 3) -> requests.Response:
+    """견고한 요청 처리"""
+    for attempt in range(max_retries):
+        try:
+            response = self.session.get(url, timeout=self.timeout)
+            response.raise_for_status()
+            return response
+        except (requests.Timeout, requests.ConnectionError) as e:
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 2  # 지수 백오프
+                logger.warning(f"재시도 {attempt + 1}/{max_retries}: {wait_time}초 대기")
+                time.sleep(wait_time)
+            else:
+                logger.error(f"최대 재시도 횟수 초과: {e}")
+                raise
+```
+
+#### 메모리 효율적 대용량 파일 처리
+```python
+def download_large_file(self, url: str, save_path: str) -> bool:
+    """대용량 파일 스트리밍 다운로드"""
+    try:
+        response = self.session.get(url, stream=True, timeout=120)
+        total_size = int(response.headers.get('content-length', 0))
+        
+        with open(save_path, 'wb') as f:
+            downloaded = 0
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    
+                    # 진행률 로깅 (10% 단위)
+                    if total_size > 0 and downloaded % (total_size // 10) < 8192:
+                        progress = (downloaded / total_size) * 100
+                        logger.info(f"다운로드 진행률: {progress:.1f}%")
+        
+        return True
+    except Exception as e:
+        logger.error(f"대용량 파일 다운로드 실패: {e}")
+        return False
+```
+
+### 9.5 테스트 및 검증 자동화 패턴
+
+#### 표준 검증 함수
+```python
+def verify_results(output_dir):
+    """표준 결과 검증 패턴"""
+    announcement_folders = [d for d in os.listdir(output_dir) 
+                          if os.path.isdir(os.path.join(output_dir, d))]
+    
+    total_items = len(announcement_folders)
+    successful_items = 0
+    total_attachments = 0
+    korean_files = 0
+    file_size_total = 0
+    
+    for folder_name in announcement_folders:
+        folder_path = os.path.join(output_dir, folder_name)
+        
+        # content.md 파일 확인
+        content_file = os.path.join(folder_path, 'content.md')
+        if os.path.exists(content_file):
+            successful_items += 1
+            
+            # 원본 URL 포함 확인
+            with open(content_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+                if '**원본 URL**:' in content:
+                    url_check_passed += 1
+        
+        # 첨부파일 검증
+        attachments_dir = os.path.join(folder_path, 'attachments')
+        if os.path.exists(attachments_dir):
+            for filename in os.listdir(attachments_dir):
+                total_attachments += 1
+                
+                # 한글 파일명 검증
+                if any(ord(char) >= 0xAC00 and ord(char) <= 0xD7A3 for char in filename):
+                    korean_files += 1
+                
+                # 파일 크기 검증
+                file_path = os.path.join(attachments_dir, filename)
+                file_size = os.path.getsize(file_path)
+                file_size_total += file_size
+    
+    # 성공률 계산 및 리포트
+    success_rate = (successful_items / total_items) * 100 if total_items > 0 else 0
+    
+    logger.info("=== 검증 결과 요약 ===")
+    logger.info(f"총 공고 수: {total_items}")
+    logger.info(f"성공적 처리: {successful_items} ({success_rate:.1f}%)")
+    logger.info(f"총 첨부파일: {total_attachments}")
+    logger.info(f"한글 파일명: {korean_files}")
+    logger.info(f"총 파일 용량: {file_size_total:,} bytes")
+    
+    return success_rate >= 80  # 80% 이상 성공 시 통과
+```
+
+### 9.6 문제 해결 패턴별 대응책
+
+#### SSL 인증서 문제
+```python
+# 문제: SSL 인증서 검증 실패 (특히 정부기관 사이트)
+# 해결: verify_ssl = False 설정
+self.verify_ssl = False
+response = self.session.get(url, verify=self.verify_ssl)
+```
+
+#### 세션 만료 문제
+```python
+# 문제: 장시간 스크래핑 시 세션 만료
+# 해결: 세션 재생성 로직
+def refresh_session_if_needed(self):
+    try:
+        # 테스트 요청으로 세션 상태 확인
+        test_response = self.session.get(self.base_url, timeout=10)
+        if test_response.status_code == 401:
+            self._create_new_session()
+    except:
+        self._create_new_session()
+```
+
+#### 동적 콘텐츠 로딩 문제
+```python
+# 문제: JavaScript로 동적 로딩되는 콘텐츠
+# 해결: Playwright 사용
+def fetch_dynamic_content(self, url: str) -> str:
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(url)
+        page.wait_for_selector('table', timeout=30000)  # 테이블 로딩 대기
+        content = page.content()
+        browser.close()
+        return content
+```
+
+### 9.7 실전 디버깅 체크리스트
+
+#### 목록 페이지 파싱 실패 시
+1. [ ] HTML 구조 변경 확인: `soup.find('table')` → `soup.find_all('table')`
+2. [ ] 클래스명 변경 확인: `.board_table` → `.table`
+3. [ ] JavaScript 렌더링 필요 여부 확인
+4. [ ] 헤더 설정 확인: User-Agent, Referer 등
+
+#### 첨부파일 다운로드 실패 시
+1. [ ] 다운로드 URL 패턴 분석: `download.php` → `fileDown.do`
+2. [ ] 세션 쿠키 필요 여부 확인
+3. [ ] Referer 헤더 설정 확인
+4. [ ] 파일명 인코딩 문제 확인
+
+#### 한글 파일명 깨짐 시
+1. [ ] Content-Disposition 헤더 분석
+2. [ ] 인코딩 순서 변경: UTF-8 → EUC-KR → CP949
+3. [ ] RFC 5987 형식 지원 확인
+4. [ ] URL 디코딩 적용 확인
+
+### 9.8 성공 사례 기반 재사용 패턴
+
+#### JBBA 타입 (표준 HTML 테이블)
+- **적용 가능**: 대부분의 정부기관, 공공기관
+- **특징**: GET 파라미터 페이지네이션, 직접 링크
+- **재사용률**: 95%
+
+#### BUSANIT 타입 (HTTP 사이트)
+- **적용 가능**: 구형 ASP/PHP 기반 사이트
+- **특징**: HTTP, 상대 URL, 표준 다운로드 패턴
+- **재사용률**: 90%
+
+#### CCEI 타입 (AJAX/JSON API)
+- **적용 가능**: 최신 웹 애플리케이션
+- **특징**: JSON API, 파일 정보 포함, POST 요청
+- **재사용률**: 70%
+
+### 9.9 개발 효율성 극대화 팁
+
+#### 1. 유사 사이트 스크래퍼 활용
+```bash
+# 기존 스크래퍼 중 가장 유사한 것을 복사해서 시작
+cp enhanced_jbba_scraper.py enhanced_newssite_scraper.py
+cp test_enhanced_jbba.py test_enhanced_newssite.py
+
+# 사이트명, URL만 변경하고 바로 테스트
+```
+
+#### 2. 단계별 개발
+```python
+# 1단계: 기본 구조만 구현 (목록 파싱)
+# 2단계: 상세 페이지 파싱 추가
+# 3단계: 첨부파일 다운로드 추가
+# 4단계: 인코딩 및 예외 처리 강화
+```
+
+#### 3. 개발 과정 문서화
+```bash
+# 개발 중 발견한 특이사항을 즉시 기록
+echo "특이사항: JavaScript 렌더링 필요" >> {사이트명}_notes.txt
+echo "해결책: Playwright 사용" >> {사이트명}_notes.txt
+```
+
+이런 패턴들을 따르면 새로운 사이트 추가 시 개발 시간을 크게 단축하고, 안정적인 스크래퍼를 만들 수 있습니다.
