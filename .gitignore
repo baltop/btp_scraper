@@ -189,3 +189,5 @@ items/
 conf/
 
 node_modules/
+
+test/
