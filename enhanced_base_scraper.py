@@ -366,9 +366,16 @@ class EnhancedBaseScraper(ABC):
         """개별 공고 처리 - 향상된 버전"""
         logger.info(f"공고 처리 중 {index}: {announcement['title']}")
         
-        # 폴더 생성 - 원래 방식으로 복원 (번호 + 제목)
-        folder_title = self.sanitize_filename(announcement['title'])[:200]
+        # 폴더 생성 - 파일시스템 제한을 고려한 제목 길이 조정
+        folder_title = self.sanitize_filename(announcement['title'])[:100]  # 100자로 단축
         folder_name = f"{index:03d}_{folder_title}"
+        
+        # 최종 폴더명이 200자 이하가 되도록 추가 조정
+        if len(folder_name) > 200:
+            # 인덱스 부분(4자) + 언더스코어(1자) = 5자를 제외하고 195자로 제한
+            folder_title = folder_title[:195]
+            folder_name = f"{index:03d}_{folder_title}"
+        
         folder_path = os.path.join(output_base, folder_name)
         os.makedirs(folder_path, exist_ok=True)
         

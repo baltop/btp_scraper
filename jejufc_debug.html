@@ -1,0 +1,177 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "https://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="https://www.w3.org/1999/xhtml"><head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=1080, user-scalable=yes">
+<meta http-equiv="cache-control" content="no-cache">
+<meta http-equiv="expires" content="0">
+<meta http-equiv="pragma" content="no-cache">
+<title>재단법인 제주콘텐츠진흥원 사이버 교육센터</title>
+<link rel="stylesheet" href="../css/studyCenterLayout.css?ver=1">
+<link rel="stylesheet" href="../css/studyCenterColor.css">
+
+<!-- 모바일 접근처리 -->
+<script language="JavaScript" type="text/JavaScript">
+/*
+  var mobileKeyWords = new Array('iPhone', 'iPod', 'BlackBerry', 'Android', 'Windows CE', 'LG', 'MOT', 'SAMSUNG', 'SonyEricsson');
+    for (var word in mobileKeyWords){
+      if (navigator.userAgent.match(mobileKeyWords[word]) != null){
+        parent.window.location.href='https://m.esangedu.kr';break;
+			}
+		}
+*/
+</script>
+<!--// 모바일 접근처리 -->
+<script type="text/javascript" src="../js/jquery-1.11.2.min.js"></script>
+<script type="text/javascript">
+  var loginUserID = "";     	//로그인 유저 아이디
+  var loginUserName = ""; 	//로그인 유저 이름
+  var loginUserLevel = "";  //로그인 유저 아이디
+  var pageMode = 'studyCenterPage';
+  var subDomain = 'jejufc';
+	var asc = '';
+  subDomain = subDomain.replace('.kisei.co.kr','');
+
+  var contentsMapping = '';
+  // 로그인 체크
+  function overlap_loginchk(){
+	  //jsloginchk.src="../api/crossLogin.php";
+	  $.ajax({
+		  url:'../api/crossLogin.php',
+		  dataType:'JSON',
+		  success:function(data){
+			  if(data.result != 'success'){
+				  alert(data.result);
+				  logOut();
+			  }
+		  }
+	  })
+	  window.setTimeout("overlap_loginchk()",10000);
+  }
+  $(document).ready(function(){
+	  overlap_loginchk()
+  })
+  
+	if(subDomain == 'gtechs') {
+		asc = 'desc';
+	}
+
+  //GNB 교육과정메뉴 출력
+  $(window).load(function(){
+	  $.get('../api/apiCategory.php',{'value01':'lectureCode', 'companyID':subDomain, 'asc':asc},function(data){
+		  var topMenu = ''
+		  $.each(data.category, function(){
+			  if(subDomain != 'kead'){
+			  topMenu += '<li onclick="top.location.href=\'lecture.php?sort01='+this.value01+'\'">';
+        
+			  topMenu += this.value02+'과정';
+			  topMenu += '</li>';
+			  }
+		  })
+      if (subDomain == 'urbanworks' || subDomain == 'jangan' || subDomain =='oneex' || subDomain =='hdecal' || subDomain=='insamansa' || subDomain=='noom' || subDomain=='pemtron' || subDomain == 'tlx' || subDomain == 'cidow' || subDomain == 'hellonature'){
+          $('#GNB li.lectureMenu > h1').attr('onClick','top.location.href="lecture.php?sort01='+data.category[1].value01+'"');
+			} else if(subDomain =='gtechs'){
+					$('#GNB li.lectureMenu > h1').attr('onClick','top.location.href="lecture.php?sort01='+data.category[0].value01+'"');
+      }else{
+          $('#GNB li.lectureMenu > h1').attr('onClick','top.location.href="lecture.php"');
+      }
+		  $('#GNB li.lectureMenu ol').html(topMenu)
+	  }).done(function(){
+        if(subDomain == 'urbanworks' || subDomain == 'jangan' || subDomain =='oneex' || subDomain =='gtechs' || subDomain =='hdecal' || subDomain=='noom' || subDomain=='insamansa' || subDomain=='pemtron' || subDomain == 'tlx' || subDomain == 'cidow' || subDomain == 'hellonature'){
+          $('.lectureMenu > ol > li:contains("의료기관과정")').css('display','none')
+        }
+      })
+  })
+</script>
+<script type="text/javascript" src="../js/studyCenterUI.js?v=1"></script>
+<script type="text/javascript" id="crossLogin"></script>
+<script type="text/javascript">
+var page = ''; //검색 페이지
+var seq = ''; //검색 페이지
+var boardCode = '1'; //검색 페이지
+var servTime = '2025-06-20 08:18:05';
+
+</script>
+<script type="text/javascript" src="../lib/SmartEditor/js/HuskyEZCreator.js" charset="utf-8"></script>
+<script type="text/javascript" src="../frontScript/_global.js"></script>
+<script type="text/javascript" src="../frontScript/_category.js"></script>
+<script type="text/javascript" src="../frontScript/_pager.js"></script>
+<script type="text/javascript" src="../frontScript/_sendData.js"></script>
+<script type="text/javascript" src="../frontScript/board.js"></script>
+<script type="text/javascript" src="../frontScript/boardList.js"></script>
+<script type="text/javascript" src="../frontScript/boardWrite.js"></script>
+<script type="text/javascript" src="../frontScript/boardView.js"></script>
+</head>
+
+<body class="type02">
+<div id="Header">
+  <div>
+	      <button type="button" onclick="top.location.href='login.php?page=bbs.php?boardCode=1'">로그인</button>
+      <!-- <button type="button" onclick="top.location.href='mypage.php'">회원가입</button> -->
+  
+	      <button type="button" class="favoriteBtn" onclick="addFavorite()">즐겨찾기</button>
+    </div>
+</div>
+<div id="GNB">
+  <div>
+    <a href="index.php"><img style="width:288px; heigth:79px;" src="/attach/studyCenter/logo_jejufc.png" alt="logo"></a>
+    <ul>
+							
+				<li>
+										<h1 onclick="top.location.href='eduinfo.php'">교육안내</h1>
+					<ol>
+						<li onclick="top.location.href='eduinfo.php'">위탁교육안내</li>
+						<li onclick="top.location.href='logic.php'">교육진행절차</li>
+						<li onclick="top.location.href='goyong.php'">환급절차</li>
+						<li onclick="top.location.href='rule.php'">교육이용안내</li>
+										</ol>
+				</li>
+					           <li class="lectureMenu">
+           <h1 onclick="top.location.href=&quot;lecture.php&quot;">교육과정소개</h1>
+           <ol><li onclick="top.location.href='lecture.php?sort01=lecture03'">공통/법정과정</li><li onclick="top.location.href='lecture.php?sort01=lecture08'">공통/직무과정</li><li onclick="top.location.href='lecture.php?sort01=lecture07'">산업별 전문직무과정</li><li onclick="top.location.href='lecture.php?sort01=lecture01'">자기계발과정</li><li onclick="top.location.href='lecture.php?sort01=lecture02'">의료기관과정</li><li onclick="top.location.href='lecture.php?sort01=lecture04'">보육기관과정</li><li onclick="top.location.href='lecture.php?sort01=lecture05'">회원사 전용 교육과정</li></ol>
+         </li>     
+            <li>
+        <h1 onclick="top.location.href='bbs.php?boardCode=1'">고객지원</h1>
+        <ol>
+          <li onclick="top.location.href='bbs.php?boardCode=1'">공지사항</li>
+          <li onclick="top.location.href='bbs.php?boardCode=2'">자주묻는질문</li>
+          <li onclick="top.location.href='mantomanWrite.php'">1:1문의</li>
+									<li onclick="top.location.href='/studyCenter/bbs.php?boardCode=9'">이벤트게시판</li>
+				        </ol>
+      </li>
+		<li class="studyMenu">
+			<h1 onclick="top.location.href='login.php?page=study.php'">내 강의실</h1>
+			<ol>
+				<li onclick="top.location.href='login.php?page=study.php'">진행중인과정</li>
+				<li onclick="top.location.href='login.php?page=history.php'">학습종료과정</li>
+				<li onclick="top.location.href='login.php?page=reTest.php'">재응시</li>
+				<li onclick="top.location.href='studyCenterOrder.php'">수강신청이력</li>
+				<li onclick="top.location.href='login.php?page=mantoman.php'">상담신청이력</li>
+							</ol>
+      </li>
+    </ul>
+  </div>
+</div><div id="wrap">
+  <div id="contents">
+    <div id="titleArea" style="background-image:url(../images/studycenter/bg_bbs.png);">
+      <!-- 페이지 네비게이션 h2, 페이지 타이틀 h1, 일반 내용출력 h3 -->
+      <h2>홈<img src="../images/global/icon_triangle.png" alt="▶">고객지원<img src="../images/global/icon_triangle.png" alt="▶"><strong>공지사항</strong></h2>
+      <h1>공지사항</h1>
+    </div>
+	<!-- 서브네이게이션 -->
+		<ul id="snb">
+	  <li onclick="top.location.href='bbs.php?boardCode=1'">공지사항</li>
+	  <li onclick="top.location.href='bbs.php?boardCode=2'">자주묻는질문</li>
+	  <li onclick="top.location.href='mantomanWrite.php'">1:1문의</li>
+	  <li onclick="top.location.href='bbs.php?boardCode=9'">이벤트</li>
+	</ul>	<!-- //서브네비게이션 -->
+    <!-- 동작호출부 -->
+    <div class="searchArea"><form class="searchForm" action="javascript:searchAct()"><select name="searchType"><option value="userName">이름</option><option value="userID">아이디</option><option value="subject">제목</option></select>&nbsp;<input name="searchValue" type="text">&nbsp;<button type="button" onclick="searchAct()">검색하기</button></form></div><ul class="tabMenu"><li id="cat" class="select">전체</li><li id="cat467">집체교육</li><li id="cat468">온라인교육</li><li id="cat469">기타</li></ul><div id="contentsArea" class="BBSList"><table><thead><tr><th style="width:50px">번호</th><th style="width:10%;">카테고리</th><th class="left">제목</th><th style="width:120px">작성일</th><th style="width:80px">조회수</th></tr></thead><tbody><tr class="notice"><td>[공지]</td><td>온라인교육</td><td class="left" onclick="viewAct(66)" style="cursor:pointer">1-5 산업안전위탁 지정교육기관 찾는 방법&nbsp;&nbsp;<img src="../images/admin/icon_addfile.png"></td><td>2018-10-22</td><td>853</td></tr><tr class="notice"><td>[공지]</td><td>온라인교육</td><td class="left" onclick="viewAct(71)" style="cursor:pointer">1-10 장애인 인식 개선 교육기관 안내 &nbsp;&nbsp;<img src="../images/admin/icon_addfile.png"></td><td>2018-10-22</td><td>1098</td></tr><tr class="notice"><td>[공지]</td><td>온라인교육</td><td class="left" onclick="viewAct(82)" style="cursor:pointer">8-1. 수료증 발급 방법공지</td><td>2019-03-12</td><td>5776</td></tr><tr class="notice"><td>[공지]</td><td>집체교육</td><td class="left" onclick="viewAct(83)" style="cursor:pointer">산업안전교육 무재해사업장 교육감면대상 확인방법</td><td>2019-03-14</td><td>460</td></tr><tr class="notice"><td>[공지]</td><td>집체교육</td><td class="left" onclick="viewAct(184)" style="cursor:pointer">안전보건공단 자료실 사용 방법</td><td>2019-06-27</td><td>454</td></tr><tr class="notice"><td>[공지]</td><td>집체교육</td><td class="left" onclick="viewAct(251)" style="cursor:pointer">3-1 산업안전·보건교육 규정 평가 및 수료기준&nbsp;&nbsp;<img src="../images/admin/icon_addfile.png"></td><td>2019-10-23</td><td>564</td></tr><tr class="notice"><td>[공지]</td><td>온라인교육</td><td class="left" onclick="viewAct(257)" style="cursor:pointer">5-3 수강과정 인터넷 브라우저 확인 방법</td><td>2019-10-25</td><td>1883</td></tr><tr class="notice"><td>[공지]</td><td>집체교육</td><td class="left" onclick="viewAct(316)" style="cursor:pointer">직장 내 성희롱 예방교육 실적입력 안내사항 - 어린이집&nbsp;&nbsp;<img src="../images/admin/icon_addfile.png"></td><td>2019-12-27</td><td>286</td></tr><tr class="notice"><td>[공지]</td><td>집체교육</td><td class="left" onclick="viewAct(319)" style="cursor:pointer">긴급복지지원 신고의무자 교육 안내의 건&nbsp;&nbsp;<img src="../images/admin/icon_addfile.png"></td><td>2020-01-08</td><td>194</td></tr><tr class="notice"><td>[공지]</td><td>집체교육</td><td class="left" onclick="viewAct(322)" style="cursor:pointer">「산업안전보건법 전면개정」교육용 교안(PPT) 송부&nbsp;&nbsp;<img src="../images/admin/icon_addfile.png"></td><td>2020-01-16</td><td>228</td></tr><tr class="notice"><td>[공지]</td><td>기타</td><td class="left" onclick="viewAct(323)" style="cursor:pointer">안전보건교육규정 개편(고시 제2020-21호)&nbsp;&nbsp;<img src="../images/admin/icon_addfile.png"></td><td>2020-01-20</td><td>148</td></tr><tr class="notice"><td>[공지]</td><td>기타</td><td class="left" onclick="viewAct(324)" style="cursor:pointer">2020년 사업주직업능력개발훈련 지원규정&nbsp;&nbsp;<img src="../images/admin/icon_addfile.png"></td><td>2020-01-22</td><td>148</td></tr><tr class="notice"><td>[공지]</td><td>기타</td><td class="left" onclick="viewAct(335)" style="cursor:pointer">※ 긴급공지 ※ 코로나 19 예방행동 수칙</td><td>2020-03-04</td><td>264</td></tr><tr class="notice"><td>[공지]</td><td>온라인교육</td><td class="left" onclick="viewAct(511)" style="cursor:pointer">6-2 mOTP 및 휴대폰 인증 오류 대처</td><td>2020-08-24</td><td>3541</td></tr><tr class="notice"><td>[공지]</td><td>온라인교육</td><td class="left" onclick="viewAct(632)" style="cursor:pointer">7-1 웨일 브라우저 사용시 수강 방법 및 오류 해결</td><td>2021-03-03</td><td>2319</td></tr><tr class="notice"><td>[공지]</td><td>온라인교육</td><td class="left" onclick="viewAct(633)" style="cursor:pointer">7-2 크롬 브라우저 사용시 수강 방법 및 오류 해결</td><td>2021-03-03</td><td>5396</td></tr><tr class="notice"><td>[공지]</td><td>집체교육</td><td class="left" onclick="viewAct(634)" style="cursor:pointer">7-3 엣지 브라우저 사용시 수강 방법 및 오류 해결</td><td>2021-03-03</td><td>4038</td></tr><tr class="notice"><td>[공지]</td><td>온라인교육</td><td class="left" onclick="viewAct(636)" style="cursor:pointer">7-5 강의 수강 시 화살표(다음페이지) 보이지 않을 시 해결방법</td><td>2021-03-03</td><td>753</td></tr><tr class="notice"><td>[공지]</td><td>온라인교육</td><td class="left" onclick="viewAct(673)" style="cursor:pointer">※ 수강시 유의 사항 (INDEX 페이지 넘김 사용 금지) ※</td><td>2021-04-12</td><td>5826</td></tr><tr class="notice"><td>[공지]</td><td>온라인교육</td><td class="left" onclick="viewAct(1959)" style="cursor:pointer">2022년 심폐소생술 CPR 수료증 발급 방법 안내</td><td>2022-07-01</td><td>2639</td></tr><tr class="notice"><td>[공지]</td><td>온라인교육</td><td class="left" onclick="viewAct(2189)" style="cursor:pointer">※ mOTP 인증 사용 방법&nbsp;&nbsp;<img src="../images/admin/icon_addfile.png"></td><td>2022-10-31</td><td>9402</td></tr><tr class="notice"><td>[공지]</td><td>집체교육</td><td class="left" onclick="viewAct(2392)" style="cursor:pointer">8-2 수료증 출력 관련 문의</td><td>2023-02-07</td><td>6161</td></tr><tr class="notice"><td>[공지]</td><td>집체교육</td><td class="left" onclick="viewAct(2781)" style="cursor:pointer">2023심폐소생술수료증 출력방법&nbsp;&nbsp;<img src="../images/admin/icon_addfile.png"></td><td>2023-07-25</td><td>3016</td></tr><tr class="notice"><td>[공지]</td><td>온라인교육</td><td class="left" onclick="viewAct(3561)" style="cursor:pointer">학습유의사항</td><td>2025-05-28</td><td>158</td></tr><tr "=""><td>65</td><td>집체교육</td><td class="left" onclick="viewAct(3584)" style="cursor:pointer">[신규] 메타버스 세미나 및 AI 학습지원도구 활용방법</td><td>2025-06-13</td><td>16</td></tr><tr "=""><td>64</td><td>온라인교육</td><td class="left" onclick="viewAct(3561)" style="cursor:pointer">학습유의사항</td><td>2025-05-28</td><td>158</td></tr><tr "=""><td>63</td><td>집체교육</td><td class="left" onclick="viewAct(2781)" style="cursor:pointer">2023심폐소생술수료증 출력방법&nbsp;&nbsp;<img src="../images/admin/icon_addfile.png"></td><td>2023-07-25</td><td>3016</td></tr><tr "=""><td>62</td><td>집체교육</td><td class="left" onclick="viewAct(2423)" style="cursor:pointer">근로자 안전보건교육 대상 사업장 조회 방법</td><td>2023-03-07</td><td>2058</td></tr><tr "=""><td>61</td><td>집체교육</td><td class="left" onclick="viewAct(2392)" style="cursor:pointer">8-2 수료증 출력 관련 문의</td><td>2023-02-07</td><td>6161</td></tr><tr "=""><td>60</td><td>온라인교육</td><td class="left" onclick="viewAct(2200)" style="cursor:pointer">※ 인증 관련 공지 ※</td><td>2022-11-02</td><td>4183</td></tr><tr "=""><td>59</td><td>온라인교육</td><td class="left" onclick="viewAct(2189)" style="cursor:pointer">※ mOTP 인증 사용 방법&nbsp;&nbsp;<img src="../images/admin/icon_addfile.png"></td><td>2022-10-31</td><td>9402</td></tr><tr "=""><td>58</td><td>온라인교육</td><td class="left" onclick="viewAct(1959)" style="cursor:pointer">2022년 심폐소생술 CPR 수료증 발급 방법 안내</td><td>2022-07-01</td><td>2639</td></tr><tr "=""><td>57</td><td>기타</td><td class="left" onclick="viewAct(1745)" style="cursor:pointer">03.21~23 서버 증설 및 추기 서버점검</td><td>2022-03-14</td><td>869</td></tr><tr "=""><td>56</td><td>온라인교육</td><td class="left" onclick="viewAct(1426)" style="cursor:pointer">11월30일 서버긴급점검</td><td>2021-11-30</td><td>702</td></tr></tbody></table><div class="pager"><div class="pager"><b>1</b><a href="javascript:pageMove(2)">2</a><a href="javascript:pageMove(3)">3</a><a href="javascript:pageMove(4)">4</a><a href="javascript:pageMove(5)">5</a><a href="javascript:pageMove(6)">6</a><a href="javascript:pageMove(7)">7</a></div></div></div>
+    <!-- //동작호출부 -->
+  </div>
+</div>
+
+	<div id="footer">
+		<div><img src="../images/global/logo_gnb.png" alt="한국중앙인재개발원"><ul><li onclick="top.location.href='about.php'">회사소개</li><li onclick="top.location.href='agree.php'">이용약관</li><li onclick="top.location.href='private.php'">개인정보 취급방침</li><li onclick="top.location.href='eduinfo.php'">환급교육 안내</li></ul><address><strong>한국중앙인재개발원</strong>&nbsp;&nbsp;|&nbsp;&nbsp;주소 : 서울시 강남구 논현로 64길 4, 2층<br>김포지사 : 경기도 김포시 태장로795번길 23 마스터비즈파크 211호<br>tel : 1644-5372&nbsp;&nbsp;|&nbsp;&nbsp;fax : 02-6203-5999&nbsp;&nbsp;|&nbsp;&nbsp;사업자등록번호 : 1328615935<br>COPYRIGHT 2018 한국중앙인재개발원 ALLRIGHT &amp; RESERVED.</address></div>
+	</div>
+
+</body></html>
