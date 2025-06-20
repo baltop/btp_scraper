@@ -19,12 +19,17 @@ gnlife,경남50+행복내일센터,http://gnlife5064.kr/bbs/board.php?bo_table=n
 gnto,경남관광재단,https://gnto.or.kr/sub04/sub01_01.php
 haenamloca,해남먹거리통합지원센터,https://haenamlocalfood.kr/bbs/board.php?bo_table=lf4_1
 hamkke,함께일하는재단,https://hamkke.org/business
-kban,엔젤투자지원센터,https://www.kban.or.kr/
+    kban,엔젤투자지원센터,https://www.kban.or.kr/        iframe 구조 때문에 첨부파일 다운로드 에러남. 첨부가 먾지 않음.
+
 kead,한국장애인고용공단,https://www.kead.or.kr/bbs/deptgongji/bbsPage.do?menuId=MENU0895
 kosha,한국산업안전보건공단,https://www.kosha.or.kr/kosha/report/notice.do
+
+
 jindo,진도군 농업기술센터,https://jindo.go.kr/atc/board/B0146.cs?m=43
 klf,강원랜드 사회공헌재단,https://klf.or.kr/story/notice/business-announcement/
-visitkorea,한국관광 품질인증,https://koreaquality.visitkorea.or.kr/qualityCenter/notice/noticeList.kto
+    visitkorea,한국관광 품질인증,https://koreaquality.visitkorea.or.kr/qualityCenter/notice/noticeList.kto  파일다운로드 안됨.
+
+
 gjcity,광주시 시립도서관,https://lib.gjcity.go.kr/lay1/bbs/S1T82C3521/H/1/list.do
 svhc,서울소셜벤처허브,https://svhc.or.kr/Notice/?category=P488271h88
 agrix,농림사업정보시스템,https://uni.agrix.go.kr/webportal/community/portalViewNoticeList.do
