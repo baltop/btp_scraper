@@ -337,28 +337,40 @@ class EnhancedBaseScraper(ABC):
         self.processed_titles.add(title_hash)
     
     def filter_new_announcements(self, announcements: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], bool]:
-        """새로운 공고만 필터링 - 중복 임계값 체크 포함"""
+        """새로운 공고만 필터링 - 이전 세션 기록 기준 중복 체크"""
         if not self.enable_duplicate_check:
             return announcements, False
         
         new_announcements = []
         duplicate_count = 0
+        current_session_titles = set()  # 현재 세션에서 처리한 제목들
         
         for ann in announcements:
             title = ann.get('title', '')
-            if not self.is_title_processed(title):
-                new_announcements.append(ann)
-            else:
+            title_hash = self.get_title_hash(title)
+            
+            # 이전 세션에서 처리된 공고인지만 확인 (현재 세션은 제외)
+            if title_hash in self.processed_titles:
                 duplicate_count += 1
-                logger.debug(f"이미 처리된 공고 스킵: {title[:200]}...")
+                logger.debug(f"이전 세션에서 처리된 공고 스킵: {title[:200]}...")
                 
                 # 중복 임계값 도달시 조기 종료 신호
                 if duplicate_count >= self.duplicate_threshold:
                     logger.info(f"연속 중복 공고 {duplicate_count}개 발견 - 조기 종료 신호")
                     break
+            else:
+                # 현재 세션에서 이미 처리했는지 확인 (현재 세션 내 중복 허용)
+                if title_hash not in current_session_titles:
+                    new_announcements.append(ann)
+                    current_session_titles.add(title_hash)
+                    duplicate_count = 0  # 새로운 공고 발견시 중복 카운트 리셋
+                else:
+                    # 현재 세션 내 중복은 로그만 남기고 포함시킴
+                    new_announcements.append(ann)
+                    logger.debug(f"현재 세션 내 중복 공고 (허용): {title[:200]}...")
         
         should_stop = duplicate_count >= self.duplicate_threshold
-        logger.info(f"전체 {len(announcements)}개 중 새로운 공고 {len(new_announcements)}개, 중복 {duplicate_count}개 발견")
+        logger.info(f"전체 {len(announcements)}개 중 새로운 공고 {len(new_announcements)}개, 이전 세션 중복 {duplicate_count}개 발견")
         
         return new_announcements, should_stop
     
