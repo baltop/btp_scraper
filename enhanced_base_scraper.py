@@ -52,7 +52,8 @@ class EnhancedBaseScraper(ABC):
         
         # 중복 체크 관련
         self.processed_titles_file = None
-        self.processed_titles = set()
+        self.processed_titles = set()  # 이전 실행에서 처리된 제목들
+        self.current_session_titles = set()  # 현재 세션에서 처리된 제목들
         self.enable_duplicate_check = True
         self.duplicate_threshold = 3  # 동일 제목 3개 발견시 조기 종료
         
@@ -300,23 +301,26 @@ class EnhancedBaseScraper(ABC):
             self.processed_titles = set()
     
     def save_processed_titles(self):
-        """처리된 제목 목록 저장"""
+        """현재 세션에서 처리된 제목들을 이전 실행 기록에 합쳐서 저장"""
         if not self.enable_duplicate_check or not self.processed_titles_file:
             return
         
         try:
             os.makedirs(os.path.dirname(self.processed_titles_file), exist_ok=True)
             
+            # 현재 세션에서 처리된 제목들을 이전 실행 기록에 합침
+            all_processed_titles = self.processed_titles | self.current_session_titles
+            
             data = {
-                'title_hashes': list(self.processed_titles),
+                'title_hashes': list(all_processed_titles),
                 'last_updated': datetime.now().isoformat(),
-                'total_count': len(self.processed_titles)
+                'total_count': len(all_processed_titles)
             }
             
             with open(self.processed_titles_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
                 
-            logger.info(f"처리된 제목 {len(self.processed_titles)}개 저장 완료")
+            logger.info(f"처리된 제목 {len(all_processed_titles)}개 저장 완료 (이전: {len(self.processed_titles)}, 현재 세션: {len(self.current_session_titles)})")
         except Exception as e:
             logger.error(f"처리된 제목 저장 실패: {e}")
     
@@ -329,48 +333,42 @@ class EnhancedBaseScraper(ABC):
         return title_hash in self.processed_titles
     
     def add_processed_title(self, title: str):
-        """처리된 제목 추가"""
+        """현재 세션에서 처리된 제목 추가 (이전 실행 기록과는 별도 관리)"""
         if not self.enable_duplicate_check:
             return
         
         title_hash = self.get_title_hash(title)
-        self.processed_titles.add(title_hash)
+        self.current_session_titles.add(title_hash)
     
     def filter_new_announcements(self, announcements: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], bool]:
-        """새로운 공고만 필터링 - 이전 세션 기록 기준 중복 체크"""
+        """새로운 공고만 필터링 - 이전 실행 기록과만 중복 체크, 현재 세션 내에서는 중복 허용"""
         if not self.enable_duplicate_check:
             return announcements, False
         
         new_announcements = []
-        duplicate_count = 0
-        current_session_titles = set()  # 현재 세션에서 처리한 제목들
+        previous_session_duplicate_count = 0  # 이전 실행 중복만 카운트
         
         for ann in announcements:
             title = ann.get('title', '')
             title_hash = self.get_title_hash(title)
             
-            # 이전 세션에서 처리된 공고인지만 확인 (현재 세션은 제외)
+            # 이전 실행에서 처리된 공고인지만 확인 (현재 세션은 제외)
             if title_hash in self.processed_titles:
-                duplicate_count += 1
-                logger.debug(f"이전 세션에서 처리된 공고 스킵: {title[:200]}...")
+                previous_session_duplicate_count += 1
+                logger.debug(f"이전 실행에서 처리된 공고 스킵: {title[:50]}...")
                 
-                # 중복 임계값 도달시 조기 종료 신호
-                if duplicate_count >= self.duplicate_threshold:
-                    logger.info(f"연속 중복 공고 {duplicate_count}개 발견 - 조기 종료 신호")
+                # 연속된 이전 실행 중복 임계값 도달시 조기 종료 신호
+                if previous_session_duplicate_count >= self.duplicate_threshold:
+                    logger.info(f"이전 실행 중복 공고 {previous_session_duplicate_count}개 연속 발견 - 조기 종료 신호")
                     break
             else:
-                # 현재 세션에서 이미 처리했는지 확인 (현재 세션 내 중복 허용)
-                if title_hash not in current_session_titles:
-                    new_announcements.append(ann)
-                    current_session_titles.add(title_hash)
-                    duplicate_count = 0  # 새로운 공고 발견시 중복 카운트 리셋
-                else:
-                    # 현재 세션 내 중복은 로그만 남기고 포함시킴
-                    new_announcements.append(ann)
-                    logger.debug(f"현재 세션 내 중복 공고 (허용): {title[:200]}...")
+                # 이전 실행에 없는 새로운 공고는 무조건 포함 (현재 세션 내 중복 완전 무시)
+                new_announcements.append(ann)
+                previous_session_duplicate_count = 0  # 새로운 공고 발견시 중복 카운트 리셋
+                logger.debug(f"새로운 공고 추가: {title[:50]}...")
         
-        should_stop = duplicate_count >= self.duplicate_threshold
-        logger.info(f"전체 {len(announcements)}개 중 새로운 공고 {len(new_announcements)}개, 이전 세션 중복 {duplicate_count}개 발견")
+        should_stop = previous_session_duplicate_count >= self.duplicate_threshold
+        logger.info(f"전체 {len(announcements)}개 중 새로운 공고 {len(new_announcements)}개, 이전 실행 중복 {previous_session_duplicate_count}개 발견")
         
         return new_announcements, should_stop
     
