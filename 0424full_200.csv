@@ -1,13 +1,15 @@
 site_code,site_name,start_url
 socialenterprise,한국사회적기업진흥원,https://www.socialenterprise.or.kr/social/board/list.do?m_cd=D019&board_code=BO02&com_certifi_num=&selectyear=&magazine=&search_word=&search_type=&mode=list&category_id=CA92
 jw1365,자원봉사포털1365,https://www.1365.go.kr/vols/P9420/bbs/bbs.do?bbsNo=994100&titleNm=%EB%AA%A9%EB%A1%9D
-kpx,KRX교육연구원,https://edu.kpx.or.kr/usr/alim/UsrAlimBasc0201.do
+    kpx,KRX교육연구원,https://edu.kpx.or.kr/usr/alim/UsrAlimBasc0201.do                  file error
 eumseongcc,음성상공회의소,https://eumseongcci.korcham.net/front/board/boardContentsListPage.do?boardId=10585&menuId=871
 fintech,한국핀테크지원센터,https://fintech.or.kr/web/board/boardContentsListPage.do?board_id=3&menu_id=6300&miv_pageNo=
 gangwon6,강원농촌융복합산업지원센터,https://gangwon6.co.kr/information/notices
 gbfood,(재)경상북도 농식품유통교육진흥원,https://www.gbfood.or.kr/public
 gbmakers,서울시기계금속제조지원센터,https://gbmakers.or.kr/notice?category=
 gbsinbo,경북신용보증재단,https://gbsinbo.co.kr/page/10054/10007.tc
+
+
 gcaf,경남문화예술진흥원,https://www.gcaf.or.kr/bbs/board.php?bo_table=sub3_7
 ggbaro,경기바로(재단법인경기도시장상권진흥원),https://ggbaro.kr/board/boardIndex.do?type=1
 globalat,aT수출종합지원시스템,https://global.at.or.kr/front/board/noticeList.do
