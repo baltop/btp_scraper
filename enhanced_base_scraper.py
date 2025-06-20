@@ -468,10 +468,12 @@ class EnhancedBaseScraper(ABC):
         
         for i, attachment in enumerate(attachments):
             try:
-                logger.info(f"  첨부파일 {i+1}: {attachment['name']}")
+                # 파일명 추출 - 다양한 키 지원 (name, filename)
+                file_name = attachment.get('filename') or attachment.get('name') or f"attachment_{i+1}"
+                logger.info(f"  첨부파일 {i+1}: {file_name}")
                 
                 # 파일명 처리
-                file_name = self.sanitize_filename(attachment['name'])
+                file_name = self.sanitize_filename(file_name)
                 if not file_name or file_name.isspace():
                     file_name = f"attachment_{i+1}"
                 
@@ -480,7 +482,7 @@ class EnhancedBaseScraper(ABC):
                 # 파일 다운로드
                 success = self.download_file(attachment['url'], file_path, attachment)
                 if not success:
-                    logger.warning(f"첨부파일 다운로드 실패: {attachment['name']}")
+                    logger.warning(f"첨부파일 다운로드 실패: {file_name}")
                 
             except Exception as e:
                 logger.error(f"첨부파일 처리 중 오류: {e}")
