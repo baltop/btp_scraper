@@ -94,31 +94,36 @@ shcca,시흥시기업인협회,https://www.shcca.com/notice
 ywbic,영월군창업보육센터,https://ywbic.kr/ywbic/bbs_list.php?code=sub01a&keyvalue=sub01
 sehub,서울특별시 사회적경제지원센터,https://sehub.net/archives/category/alarm/opencat
 gsic,경기도사회적경제원,https://gsic.or.kr/home/kor/M837392473/board.do?
+
 korcham,서울상공회의소,https://www.korcham.net/nCham/Service/Kcci/appl/KcciNoticeList.asp
 bcci,부산상공회의소,https://www.bcci.or.kr/kr/index.php?pCode=notice
 dcci,대구상공회의소,https://www.dcci.or.kr/content.html?md=0028
 incheon,인천상공회의소,https://incheon.korcham.net/front/board/boardContentsListPage.do?boardId=51228&menuId=10130
 gjcci,광주상공회의소,http://www.gjcci.or.kr/user/board/lists/board_cd/3010
+
 daejeoncci,대전상공회의소,https://daejeoncci.korcham.net/front/board/boardContentsListPage.do?boardId=10026&menuId=198
 ulsancci,울산상공회의소,https://ulsancci.korcham.net/front/board/boardContentsListPage.do?boardId=10099&menuId=707
 suwoncci,수원상공회의소,https://suwoncci.korcham.net/front/board/boardContentsListPage.do?boardId=10023&menuId=47
 acci,안양상공회의소,https://acci.korcham.net/front/board/boardContentsListPage.do?boardId=10730&menuId=9949
-sncci,성남상공회의소,https://www.sncci.net/new/sub01/sub0101.php
+
 icheoncci,이천상공회의소,https://icheoncci.korcham.net/front/board/boardContentsListPage.do?boardId=10171&menuId=5121
 ansancci,안산상공회의소,https://ansancci.korcham.net/front/board/boardContentsListPage.do?boardId=10184&menuId=2922
+###### 0621
+
 hwaseongcc,화성상공회의소,https://hwaseongcci.korcham.net/front/board/boardContentsListPage.do?boardId=11414&menuId=4885
 yongincci,용인상공회의소,https://yongincci.korcham.net/front/board/boardContentsListPage.do?boardId=10214&menuId=669
-gimpocci,김포상공회의소,https://gimpocci.net/%ea%b3%b5%ec%a7%80%ec%82%ac%ed%95%ad/
 ghcci,하남광주상공회의소,https://ghcci.korcham.net/front/board/boardContentsListPage.do?boardId=10426&menuId=1584
 pccci,포천상공회의소,https://pccci.korcham.net/front/board/boardContentsListPage.do?boardId=10785&menuId=1392
-pajucci,파주상공회의소,http://pajucci.korcham.net/notice
 sokchocci,속초상공회의소,https://sokchocci.korcham.net/front/board/boardContentsListPage.do?boardId=10635&menuId=2750
 donghaecci,동해상공회의소,https://donghaecci.korcham.net/front/board/boardContentsListPage.do?boardId=10663&menuId=2422
 taebaekcci,태백상공회의소,https://taebaekcci.korcham.net/front/board/boardContentsListPage.do?boardId=10687&menuId=1183
 jincci,진천상공회의소,https://jincci.korcham.net/front/board/boardContentsListPage.do?boardId=10777&menuId=1534
 seosancci,서산상공회의소,https://seosancci.korcham.net/front/board/boardContentsListPage.do?boardId=10487&menuId=2698
 jcci,전주상공회의소,https://jcci.korcham.net/front/board/boardContentsListPage.do?boardId=11190&menuId=4048
+###  0622     usd9.95      
+
 iksancci,익산상공회의소,https://iksancci.korcham.net/front/board/boardContentsListPage.do?boardId=10543&menuId=1323
+
 gunsancci,군산상공회의소,https://gunsancci.korcham.net/front/board/boardContentsListPage.do?boardId=10573&menuId=5135
 jscci,전북서남상공회의소,https://jscci.korcham.net/front/board/boardContentsListPage.do?boardId=10673&menuId=1402
 scci1,순천상공회의소,https://scci.korcham.net/front/board/boardContentsListPage.do?boardId=10734&menuId=2796
@@ -135,6 +140,11 @@ yangsancci,양산상공회의소,https://yangsancci.korcham.net/front/board/boar
 miryangcci,밀양상공회의소,https://miryangcci.korcham.net/front/board/boardContentsListPage.do?boardId=10485&menuId=2505
 hamancci,함안상공회의소,https://hamancci.korcham.net/front/board/boardContentsListPage.do?boardId=10521&menuId=10057
 jejucci,제주상공회의소,https://jejucci.korcham.net/front/board/boardContentsListPage.do?boardId=10088&menuId=379
+
+sncci,성남상공회의소,https://www.sncci.net/new/sub01/sub0101.php
+gimpocci,김포상공회의소,https://gimpocci.net/%ea%b3%b5%ec%a7%80%ec%82%ac%ed%95%ad/
+pajucci,파주상공회의소,http://pajucci.korcham.net/notice
+
 seoul,서울특별시 농업기술센터,https://agro.seoul.go.kr/archives/category/institution_c1/institution_news_c1/institution_news_gosi-n2
 busan,부산광역시 농업기술센터,https://www.busan.go.kr/nongup/agricommunity11
 gsff,재단법인군산먹거리통합지원센터,https://www.gsff.or.kr/bbs/board.php?bo_table=sub03_01
