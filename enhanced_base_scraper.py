@@ -555,6 +555,8 @@ class EnhancedBaseScraper(ABC):
             logger.info(f"스크래핑 완료: 총 {processed_count}개 새로운 공고 처리 (조기종료: {stop_reason})")
         else:
             logger.info(f"스크래핑 완료: 총 {processed_count}개 새로운 공고 처리")
+        
+        return True
     
     def _get_page_announcements(self, page_num: int) -> List[Dict[str, Any]]:
         """페이지별 공고 목록 가져오기 - 기본 구현"""

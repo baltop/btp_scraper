@@ -80,40 +80,58 @@ cbf,(재)춘천바이오산업진흥원,http://www.cbf.or.kr/twb_bbs/bbs_list.ph
 kiria,한국로봇산업진흥원,https://kiria.org/portal/info/portalInfoNotiList.do;jsessionid=520472C1F39076F8FF64859FDA134332
 gsif,강릉과학산업진흥원,https://mybiz.gsipa.or.kr/gsipa/bbs_list.do?code=sub03a&keyvalue=sub03
 djbaAnnc,대전일자리경제진흥원 - 유관기관,https://www.djbea.or.kr/pms/st/st_0205/list
-cceiGyeongnam,경남창조경제혁신센터,https://ccei.creativekorea.or.kr/gyeongnam/allim/allim_list.do?div_code=1
+    cceiGyeongnam,경남창조경제혁신센터,https://ccei.creativekorea.or.kr/gyeongnam/allim/allim_list.do?div_code=1
+
+
 gimb,환동해산업연구원,http://mire.re.kr/sub4_4.php?PHPSESSID=e90e1c5af211a879b62c46091ad71dce
-cceiChungbuk,충북창조경제혁신센터,https://ccei.creativekorea.or.kr/chungbuk/custom/notice_list.do?
-gepaGwangju,광주광역시 기업지원시스템,http://203.251.57.106:82/jwsys_site/gepa/main.html
+    cceiChungbuk,충북창조경제혁신센터,https://ccei.creativekorea.or.kr/chungbuk/custom/notice_list.do?
+    gepaGwangju,광주광역시 기업지원시스템,http://203.251.57.106:82/jwsys_site/gepa/main.html    숫자주소
 dcb,(재)부산디자인진흥원,https://www.dcb.or.kr/01_news/?mcode=0401010000
-cceiGyeonggi,경기창조경제혁신센터,https://ccei.creativekorea.or.kr/gyeonggi/custom/notice_list.do?&sPtime=all&page=1
+    cceiGyeonggi,경기창조경제혁신센터,https://ccei.creativekorea.or.kr/gyeonggi/custom/notice_list.do?&sPtime=all&page=1
 jbf,(재)전남바이오진흥원,http://www.jbf.kr/main/board.action?cmsid=101050200000
 cepaMarket,충남경제진흥원-공지사항,https://www.cepa.or.kr/notice/notice.do?pm=6&ms=32
 cheongjucci,청주상공회의소,https://cheongjucci.korcham.net/front/board/boardContentsListPage.do?boardId=10701&menuId=1561
 gib,경북바이오산업연구원,https://gib.re.kr/module/bbs/list.php?mid=/news/notice
 gbtpinfo,경북테크노파크 - 일반공고,https://gbtp.or.kr/user/board.do?bbsId=BBSMSTR_000000000023
 dgdc,대구경북디자인진흥원,https://dgdp.or.kr/notice/public
-cbcci,충남북부상공회의소,https://cbcci.korcham.net/front/board/boardContentsListPage.do?boardId=10413&menuId=3382
+    cbcci,충남북부상공회의소,https://cbcci.korcham.net/front/board/boardContentsListPage.do?boardId=10413&menuId=3382
 exportvoucher,수출지원기반활용사업,https://www.exportvoucher.com/portal/board/boardList?bbs_id=1
 dgmif,대구경북첨단의료산업진흥재단,https://www.kmedihub.re.kr/index.do?menu_id=00000063
 jepa,전라남도중소기업일자리경제진흥원-공지사항,https://www.jepa.kr/bbs/?b_id=notice&site=new_jepa&mn=426
 smtech,중소기업 기술개발사업 종합관리시스템,https://www.smtech.go.kr/front/ifg/no/notice02
 kca,한국방송통신전파진흥원,https://www.kca.kr/boardList.do?boardId=NOTICE&pageId=www47
-itech,한국산업기술기획평가원,https://srome.keit.re.kr/srome/biz/perform/opnnPrpsl/retrieveTaskAnncmListView.do?prgmId=XPG201040000&rcveStatus=A
-cceiJeju,제주창조경제혁신센터,https://ccei.creativekorea.or.kr/jeju/custom/notice_list.do?
+srome itech,한국산업기술기획평가원,https://srome.keit.re.kr/srome/biz/perform/opnnPrpsl/retrieveTaskAnncmListView.do?prgmId=XPG201040000&rcveStatus=A
+    cceiJeju,제주창조경제혁신센터,https://ccei.creativekorea.or.kr/jeju/custom/notice_list.do?
+
+
+
 kdata,한국데이터산업진흥원,https://www.kdata.or.kr/kr/board/notice_01/boardList.do
+
 koema,한국전기산업진흥회,https://www.koema.or.kr/koema/report/total_notice.html
     cnsp,충남경제진흥원-사업공고,https://www.cnsp.or.kr/project/list.do
 jbsos,전북소상공인광역지원센터((재)전북특별자치도경제통상진흥원),https://www.jbsos.or.kr/bbs/board.php?bo_table=s_sub04_01
-iris,범부처통합연구지원시스템(한국과학기술기획평가원),https://www.iris.go.kr/contents/retrieveBsnsAncmBtinSituListView.do
+    iris,범부처통합연구지원시스템(한국과학기술기획평가원),https://www.iris.go.kr/contents/retrieveBsnsAncmBtinSituListView.do  파일다운로드 실패
 seoulRndb,재단법인서울경제진흥원,https://seoul.rnbd.kr/client/c030100/c030100_00.jsp
+
+
+
 utp,울산테크노파크,https://www.utp.or.kr/include/contents.php?mnuno=M0000018&menu_group=1&sno=0102
-cceiPohang,포항창조경제혁신센터,https://ccei.creativekorea.or.kr/pohang/custom/notice_list.do?&sPtime=my&page=1
-seoulsbdc,서울시 자영업지원센터,https://www.seoulsbdc.or.kr/bs/BS_LIST.do?boardCd=B061
+
+    cceiPohang,포항창조경제혁신센터,https://ccei.creativekorea.or.kr/pohang/custom/notice_list.do?&sPtime=my&page=1
+    seoulsbdc,서울시 자영업지원센터,https://www.seoulsbdc.or.kr/bs/BS_LIST.do?boardCd=B061    안티봇 적용 사이트
 sbizsup,소상공인시장진흥공단 - 공지사항,https://semas.or.kr/web/board/webBoardList.kmdc?bCd=1&pNm=BOA0101
 gcube,경북문화재단 콘텐츠진흥원,https://gcube.or.kr:1021/home/sub1/sub1.asp
-cceiDaeGu,대구창조경제혁신센터,https://ccei.creativekorea.or.kr/daegu/custom/notice_list.do?
+
+
+
+    cceiDaeGu,대구창조경제혁신센터,https://ccei.creativekorea.or.kr/daegu/custom/notice_list.do?
 pohangcci,포항상공회의소,http://pohangcci.korcham.net/front/board/boardContentsListPage.do?boardId=10275&menuId=1440
+
+
 gyeongsancci,경산상공회의소,http://gyeongsancci.korcham.net/front/board/boardContentsListPage.do?boardId=10334&menuId=1905
+06 21 01
+
+
 gigca,광주미래차모빌리티진흥원,https://gama.or.kr/bbs/?b_id=green_notice&site=basic&mn=1136
 scci,순천상공회의소,https://scci.korcham.net/front/board/boardContentsListPage.do?boardId=10734&menuId=2796
 yeongcheoncci,영천상공회의소,http://yeongcheoncci.korcham.net/front/board/boardContentsListPage.do?boardId=10342&menuId=5170
