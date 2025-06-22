@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Yongincci(용인상공회의소) 스크래퍼 - Enhanced 버전
+Yangsancci(양산상공회의소) 스크래퍼 - Enhanced 버전
 """
 
 import re
@@ -13,22 +13,22 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class EnhancedYongincciScraper(StandardTableScraper):
-    """용인상공회의소 공지사항 스크래퍼 - 향상된 버전"""
+class EnhancedYangsancciScraper(StandardTableScraper):
+    """양산상공회의소 공지사항 스크래퍼 - 향상된 버전"""
     
     def __init__(self):
         super().__init__()
-        self.base_url = "https://yongincci.korcham.net"
-        self.list_url = "https://yongincci.korcham.net/front/board/boardContentsListPage.do?boardId=10214&menuId=669"
+        self.base_url = "https://yangsancci.korcham.net"
+        self.list_url = "https://yangsancci.korcham.net/front/board/boardContentsListPage.do?boardId=11367&menuId=10249"
         
-        # Yongincci 특화 설정 - 타임아웃 대기시간 증가
+        # Yangsancci 특화 설정 - 타임아웃 대기시간 증가
         self.verify_ssl = True
         self.default_encoding = 'utf-8'
         self.timeout = 60  # 60초로 증가
         self.delay_between_requests = 3  # 3초로 증가
         
         # JavaScript 기반 상세 페이지 접근을 위한 기본 URL
-        self.detail_base_url = "https://yongincci.korcham.net/front/board/boardContentsView.do"
+        self.detail_base_url = "https://yangsancci.korcham.net/front/board/boardContentsView.do"
         
     def get_list_url(self, page_num: int) -> str:
         """페이지별 URL 생성 (JavaScript 기반 페이지네이션)"""
@@ -137,7 +137,7 @@ class EnhancedYongincciScraper(StandardTableScraper):
                 # 상세 페이지 URL 구성
                 detail_url = f"{self.detail_base_url}?contentsId={content_id}"
                 
-                # 작성일은 용인CCI에서는 목록에 없을 수 있음 (상세페이지에서 확인)
+                # 작성일은 양산CCI에서는 목록에 없을 수 있음 (상세페이지에서 확인)
                 date = ""
                 if len(cells) > 2:
                     date = cells[2].get_text(strip=True)
@@ -312,7 +312,7 @@ class EnhancedYongincciScraper(StandardTableScraper):
                 
                 browser.close()
             
-            logger.info(f"Playwright로 {len(announcements)}개 공고 파싱 완료")
+            logger.info(f"페이지 {page_num}에서 Playwright로 {len(announcements)}개 공고 파싱 완료")
             return announcements
             
         except ImportError:
@@ -556,8 +556,8 @@ class EnhancedYongincciScraper(StandardTableScraper):
             time.sleep(self.delay_between_requests)
 
 # 테스트용 함수
-def test_yongincci_scraper(pages=3):
-    """Yongincci 스크래퍼 테스트"""
+def test_yangsancci_scraper(pages=3):
+    """Yangsancci 스크래퍼 테스트"""
     import os
     
     # 로깅 설정
@@ -566,13 +566,13 @@ def test_yongincci_scraper(pages=3):
         format='%(asctime)s - %(levelname)s - %(message)s'
     )
     
-    scraper = EnhancedYongincciScraper()
-    output_dir = "output/yongincci"
+    scraper = EnhancedYangsancciScraper()
+    output_dir = "output/yangsancci"
     os.makedirs(output_dir, exist_ok=True)
     
-    logger.info(f"Yongincci 스크래퍼 테스트 시작 - {pages}페이지")
+    logger.info(f"Yangsancci 스크래퍼 테스트 시작 - {pages}페이지")
     scraper.scrape_pages(max_pages=pages, output_base=output_dir)
-    logger.info("Yongincci 스크래퍼 테스트 완료")
+    logger.info("Yangsancci 스크래퍼 테스트 완료")
 
 if __name__ == "__main__":
-    test_yongincci_scraper(3)
+    test_yangsancci_scraper(3)

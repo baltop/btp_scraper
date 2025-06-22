@@ -52,6 +52,9 @@ class EnhancedBaseScraper(ABC):
         
         # 중복 체크 관련
         self.processed_titles_file = None
+        
+        # 현재 페이지 번호 (페이지네이션 지원)
+        self.current_page_num = 1
         self.processed_titles = set()  # 이전 실행에서 처리된 제목들
         self.current_session_titles = set()  # 현재 세션에서 처리된 제목들
         self.enable_duplicate_check = True
@@ -572,6 +575,8 @@ class EnhancedBaseScraper(ABC):
             logger.warning(f"페이지 {page_num} HTTP 에러: {response.status_code}")
             return []
         
+        # 현재 페이지 번호를 인스턴스 변수로 저장
+        self.current_page_num = page_num
         announcements = self.parse_list_page(response.text)
         
         # 추가 마지막 페이지 감지 로직

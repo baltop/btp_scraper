@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Yongincci(용인상공회의소) 스크래퍼 - Enhanced 버전
+Tongyeongcci(통영상공회의소) 스크래퍼 - Enhanced 버전
 """
 
 import re
@@ -13,22 +13,22 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class EnhancedYongincciScraper(StandardTableScraper):
-    """용인상공회의소 공지사항 스크래퍼 - 향상된 버전"""
+class EnhancedTongyeongcciScraper(StandardTableScraper):
+    """통영상공회의소 공지사항 스크래퍼 - 향상된 버전"""
     
     def __init__(self):
         super().__init__()
-        self.base_url = "https://yongincci.korcham.net"
-        self.list_url = "https://yongincci.korcham.net/front/board/boardContentsListPage.do?boardId=10214&menuId=669"
+        self.base_url = "https://tongyeongcci.korcham.net"
+        self.list_url = "https://tongyeongcci.korcham.net/front/board/boardContentsListPage.do?boardId=10374&menuId=1227"
         
-        # Yongincci 특화 설정 - 타임아웃 대기시간 증가
+        # Tongyeongcci 특화 설정 - 타임아웃 대기시간 증가
         self.verify_ssl = True
         self.default_encoding = 'utf-8'
         self.timeout = 60  # 60초로 증가
         self.delay_between_requests = 3  # 3초로 증가
         
         # JavaScript 기반 상세 페이지 접근을 위한 기본 URL
-        self.detail_base_url = "https://yongincci.korcham.net/front/board/boardContentsView.do"
+        self.detail_base_url = "https://tongyeongcci.korcham.net/front/board/boardContentsView.do"
         
     def get_list_url(self, page_num: int) -> str:
         """페이지별 URL 생성 (JavaScript 기반 페이지네이션)"""
@@ -40,9 +40,6 @@ class EnhancedYongincciScraper(StandardTableScraper):
     
     def parse_list_page(self, html_content: str) -> list:
         """목록 페이지 파싱 - JavaScript 렌더링된 내용도 고려"""
-        # 현재 페이지 번호를 인스턴스 변수에서 가져오기
-        page_num = getattr(self, 'current_page_num', 1)
-        
         soup = BeautifulSoup(html_content, 'html.parser')
         announcements = []
         
@@ -67,7 +64,7 @@ class EnhancedYongincciScraper(StandardTableScraper):
         if not rows:
             logger.warning("행을 찾을 수 없습니다. JavaScript 렌더링이 필요할 수 있습니다.")
             # JavaScript 렌더링 필요 - Playwright 사용 필요
-            return self._parse_with_playwright(page_num)
+            return self._parse_with_playwright()
         
         # 헤더 행 제외하고 데이터 행만 처리
         data_rows = []
@@ -86,29 +83,8 @@ class EnhancedYongincciScraper(StandardTableScraper):
                 if len(cells) < 2:
                     continue
                 
-                # 번호 (첫 번째 셀) - "공지" 이미지 처리
-                number_cell = cells[0]
-                number = number_cell.get_text(strip=True)
-                
-                # 공지 이미지 확인
-                notice_img = number_cell.find_all('img')
-                is_notice = False
-                
-                if notice_img:
-                    for img in notice_img:
-                        src = img.get('src', '')
-                        alt = img.get('alt', '')
-                        if '공지' in src or '공지' in alt or 'notice' in src.lower():
-                            is_notice = True
-                            number = "공지"
-                            break
-                
-                # 공지인 경우 번호를 "공지"로 설정
-                if is_notice:
-                    number = "공지"
-                elif not number:
-                    # 번호도 없고 공지도 아닌 경우, 행 인덱스를 번호로 사용
-                    number = f"row_{len(announcements)+1}"
+                # 번호 (첫 번째 셀) - "공지" 이미지가 있을 수 있음
+                number = cells[0].get_text(strip=True)
                 
                 # 제목 셀 (두 번째 셀)
                 title_cell = cells[1]
@@ -137,7 +113,7 @@ class EnhancedYongincciScraper(StandardTableScraper):
                 # 상세 페이지 URL 구성
                 detail_url = f"{self.detail_base_url}?contentsId={content_id}"
                 
-                # 작성일은 용인CCI에서는 목록에 없을 수 있음 (상세페이지에서 확인)
+                # 작성일은 통영CCI에서는 목록에 없을 수 있음 (상세페이지에서 확인)
                 date = ""
                 if len(cells) > 2:
                     date = cells[2].get_text(strip=True)
@@ -151,7 +127,7 @@ class EnhancedYongincciScraper(StandardTableScraper):
                 }
                 
                 announcements.append(announcement)
-                logger.debug(f"공고 추가: [{number}] {title}")
+                logger.debug(f"공고 추가: {title}")
                 
             except Exception as e:
                 logger.error(f"행 파싱 중 오류: {e}")
@@ -160,8 +136,8 @@ class EnhancedYongincciScraper(StandardTableScraper):
         logger.info(f"총 {len(announcements)}개 공고 파싱 완료")
         return announcements
     
-    def _parse_with_playwright(self, page_num: int = 1):
-        """Playwright를 사용한 JavaScript 렌더링 후 파싱 - 페이지네이션 지원"""
+    def _parse_with_playwright(self):
+        """Playwright를 사용한 JavaScript 렌더링 후 파싱 - 타임아웃 증가"""
         try:
             from playwright.sync_api import sync_playwright
             
@@ -181,24 +157,6 @@ class EnhancedYongincciScraper(StandardTableScraper):
                 # 추가 대기시간
                 page.wait_for_timeout(3000)
                 
-                # 2페이지 이상인 경우 해당 페이지로 이동
-                if page_num > 1:
-                    try:
-                        # JavaScript 함수로 페이지 이동
-                        logger.info(f"페이지 {page_num}로 이동 중")
-                        page.evaluate(f"go_Page({page_num})")
-                        
-                        # 페이지 로드 대기
-                        page.wait_for_load_state('networkidle', timeout=30000)
-                        page.wait_for_timeout(3000)
-                        
-                        logger.info(f"페이지 {page_num} 로드 완료")
-                        
-                    except Exception as e:
-                        logger.error(f"페이지 {page_num}로 이동 실패: {e}")
-                        browser.close()
-                        return []
-                
                 # 테이블 요소들 추출 - 다양한 선택자 시도
                 rows = []
                 
@@ -208,12 +166,11 @@ class EnhancedYongincciScraper(StandardTableScraper):
                     temp_rows = page.locator(selector).all()
                     if temp_rows:
                         rows = temp_rows
-                        logger.info(f"페이지 {page_num}에서 '{selector}' 선택자로 {len(rows)}개 행 발견")
+                        logger.info(f"Playwright로 '{selector}' 선택자로 {len(rows)}개 행 발견")
                         break
                 
                 if not rows:
-                    logger.warning(f"페이지 {page_num}에서 행을 찾을 수 없습니다.")
-                    browser.close()
+                    logger.warning("Playwright로도 행을 찾을 수 없습니다.")
                     return []
                 
                 for i, row in enumerate(rows):
@@ -225,32 +182,11 @@ class EnhancedYongincciScraper(StandardTableScraper):
                             logger.debug(f"행 {i}: 셀 수 부족 ({len(cells)}개)")
                             continue
                         
-                        # 번호 (공지 이미지 포함 처리)
-                        number_cell = cells[0]
-                        number = number_cell.inner_text().strip()
-                        
-                        # 공지 이미지 확인
-                        notice_img = number_cell.locator('img').all()
-                        is_notice = False
-                        
-                        if notice_img:
-                            for img in notice_img:
-                                src = img.get_attribute('src') or ''
-                                alt = img.get_attribute('alt') or ''
-                                if '공지' in src or '공지' in alt or 'notice' in src.lower():
-                                    is_notice = True
-                                    number = "공지"
-                                    break
-                        
-                        # 공지인 경우 번호를 "공지"로 설정
-                        if is_notice:
-                            number = "공지"
-                        elif not number:
-                            # 번호도 없고 공지도 아닌 경우, 행 인덱스를 번호로 사용
-                            number = f"row_{i}"
-                        
-                        # 모든 행을 처리하도록 유효성 검사 완화
-                        # (번호가 있거나, 공지이거나, 임시 번호가 있으면 처리)
+                        # 번호
+                        number = cells[0].inner_text().strip()
+                        if not number or (number.isdigit() == False and number != "공지"):
+                            logger.debug(f"행 {i}: 번호가 유효하지 않음 ({number})")
+                            continue
                         
                         # 제목과 링크
                         title_cell = cells[1]
@@ -304,7 +240,7 @@ class EnhancedYongincciScraper(StandardTableScraper):
                         }
                         
                         announcements.append(announcement)
-                        logger.info(f"공고 추가: [{number}] {title}")
+                        logger.info(f"공고 추가: {title}")
                         
                     except Exception as e:
                         logger.error(f"Playwright 행 {i} 파싱 중 오류: {e}")
@@ -556,8 +492,8 @@ class EnhancedYongincciScraper(StandardTableScraper):
             time.sleep(self.delay_between_requests)
 
 # 테스트용 함수
-def test_yongincci_scraper(pages=3):
-    """Yongincci 스크래퍼 테스트"""
+def test_tongyeongcci_scraper(pages=3):
+    """Tongyeongcci 스크래퍼 테스트"""
     import os
     
     # 로깅 설정
@@ -566,13 +502,13 @@ def test_yongincci_scraper(pages=3):
         format='%(asctime)s - %(levelname)s - %(message)s'
     )
     
-    scraper = EnhancedYongincciScraper()
-    output_dir = "output/yongincci"
+    scraper = EnhancedTongyeongcciScraper()
+    output_dir = "output/tongyeongcci"
     os.makedirs(output_dir, exist_ok=True)
     
-    logger.info(f"Yongincci 스크래퍼 테스트 시작 - {pages}페이지")
+    logger.info(f"Tongyeongcci 스크래퍼 테스트 시작 - {pages}페이지")
     scraper.scrape_pages(max_pages=pages, output_base=output_dir)
-    logger.info("Yongincci 스크래퍼 테스트 완료")
+    logger.info("Tongyeongcci 스크래퍼 테스트 완료")
 
 if __name__ == "__main__":
-    test_yongincci_scraper(3)
+    test_tongyeongcci_scraper(3)

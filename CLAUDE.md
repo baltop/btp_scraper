@@ -484,6 +484,436 @@ def _extract_filename_from_response(self, response, default_path):
 
 # robots.txt는 무시할 것.
 
-## 10. 새로운 메모리
+## 10. 상공회의소(CCI) 스크래퍼 공지 공고 포함 수집 가이드
+
+### 10.1 문제 상황
+기존 상공회의소 스크래퍼들은 "공지" 표시가 있는 상단 고정 공고들을 제외하고 번호가 붙은 일반 공고만 수집하는 문제가 있었습니다.
+
+**문제점**:
+- 게시판 상단의 중요한 "공지" 공고들이 수집되지 않음
+- 번호가 없는 공고들이 필터링되어 누락됨
+- 실제 수집 공고 수가 예상보다 적음
+
+### 10.2 해결 방안 (양산상공회의소 기준)
+
+#### 10.2.1 공지 이미지 인식 로직 추가
+
+**HTML 파싱 버전 (BeautifulSoup)**:
+```python
+# 번호 (첫 번째 셀) - "공지" 이미지 처리
+number_cell = cells[0]
+number = number_cell.get_text(strip=True)
+
+# 공지 이미지 확인
+notice_img = number_cell.find_all('img')
+is_notice = False
+
+if notice_img:
+    for img in notice_img:
+        src = img.get('src', '')
+        alt = img.get('alt', '')
+        if '공지' in src or '공지' in alt or 'notice' in src.lower():
+            is_notice = True
+            number = "공지"
+            break
+
+# 공지인 경우 번호를 "공지"로 설정
+if is_notice:
+    number = "공지"
+elif not number:
+    # 번호도 없고 공지도 아닌 경우, 행 인덱스를 번호로 사용
+    number = f"row_{len(announcements)+1}"
+```
+
+**Playwright 버전 (JavaScript 렌더링)**:
+```python
+# 번호 (공지 이미지 포함 처리)
+number_cell = cells[0]
+number = number_cell.inner_text().strip()
+
+# 공지 이미지 확인
+notice_img = number_cell.locator('img').all()
+is_notice = False
+
+if notice_img:
+    for img in notice_img:
+        src = img.get_attribute('src') or ''
+        alt = img.get_attribute('alt') or ''
+        if '공지' in src or '공지' in alt or 'notice' in src.lower():
+            is_notice = True
+            number = "공지"
+            break
+
+# 공지인 경우 번호를 "공지"로 설정
+if is_notice:
+    number = "공지"
+elif not number:
+    number = f"row_{i}"
+```
+
+#### 10.2.2 유효성 검사 완화
+
+**기존 (문제있는) 코드**:
+```python
+# 이 조건으로 인해 공지 공고들이 제외됨
+if not number or (number.isdigit() == False and number != "공지"):
+    continue
+```
+
+**수정된 (올바른) 코드**:
+```python
+# 모든 행을 처리하도록 유효성 검사 완화
+# (번호가 있거나, 공지이거나, 임시 번호가 있으면 처리)
+# 별도 continue 조건 제거하여 모든 공고 처리
+```
+
+#### 10.2.3 로그 출력 개선
+
+```python
+# 공고 유형을 명확히 표시
+logger.info(f"공고 추가: [{number}] {title}")
+
+# 결과 예시:
+# 공고 추가: [공지] 양산상공회의소 공식 인스타그램·카카오톡 채널 개설 안내
+# 공고 추가: [415] 2025년 연중모금캠페인 희망나눔 착착착 나눔캠페인 성금 모금
+```
+
+### 10.3 적용 대상 스크래퍼 목록
+
+다음 상공회의소 스크래퍼들에 동일한 수정사항을 적용해야 합니다:
+
+1. **yongincci** - 용인상공회의소
+2. **jinjucci** - 진주상공회의소  
+3. **tongyeongcci** - 통영상공회의소
+4. **sacheoncci** - 사천상공회의소
+5. **changwoncci** - 창원상공회의소
+6. **yangsancci** - 양산상공회의소 ✅ (완료)
+
+### 10.4 수정 작업 체크리스트
+
+각 CCI 스크래퍼별로 다음 항목들을 확인하고 수정:
+
+#### ✅ 필수 수정사항
+- [ ] **공지 이미지 인식 로직** 추가 (HTML 파싱 버전)
+- [ ] **공지 이미지 인식 로직** 추가 (Playwright 버전)
+- [ ] **유효성 검사 완화** (모든 공고 처리하도록)
+- [ ] **임시 번호 부여** 로직 추가
+- [ ] **로그 출력 개선** (공고 유형 표시)
+
+#### ✅ 테스트 항목
+- [ ] **1페이지 테스트**: 공지 공고 포함 15개 모두 수집되는지 확인
+- [ ] **3페이지 테스트**: 페이지네이션 정상 작동 및 전체 45개 수집 확인
+- [ ] **첨부파일 다운로드**: 공지 공고의 첨부파일도 정상 다운로드되는지 확인
+- [ ] **파일명 처리**: 한글 파일명 및 특수문자 정상 처리 확인
+
+#### ✅ 검증 기준
+- **수집 공고 수**: 페이지당 15개 (공지 ~10개 + 번호 공고 ~5개)
+- **성공률**: 100% (모든 공고 정상 처리)
+- **파일 다운로드**: 첨부파일 무결성 확인
+- **하위 호환성**: 기존 기능 정상 작동 확인
+
+### 10.5 표준 코드 템플릿
+
+#### 10.5.1 공지 처리 함수 (공통)
+
+```python
+def _process_notice_detection(self, cell, row_index=0):
+    """공지 이미지 감지 및 번호 처리 - 모든 CCI에서 재사용 가능"""
+    number = cell.get_text(strip=True) if hasattr(cell, 'get_text') else cell.inner_text().strip()
+    is_notice = False
+    
+    # 이미지 찾기 (BeautifulSoup vs Playwright)
+    if hasattr(cell, 'find_all'):  # BeautifulSoup
+        notice_imgs = cell.find_all('img')
+        for img in notice_imgs:
+            src = img.get('src', '')
+            alt = img.get('alt', '')
+            if '공지' in src or '공지' in alt or 'notice' in src.lower():
+                is_notice = True
+                break
+    else:  # Playwright
+        notice_imgs = cell.locator('img').all()
+        for img in notice_imgs:
+            src = img.get_attribute('src') or ''
+            alt = img.get_attribute('alt') or ''
+            if '공지' in src or '공지' in alt or 'notice' in src.lower():
+                is_notice = True
+                break
+    
+    # 번호 결정
+    if is_notice:
+        return "공지"
+    elif not number:
+        return f"row_{row_index}"
+    else:
+        return number
+```
+
+#### 10.5.2 수정 전후 비교 예시
+
+**수정 전 (문제)**:
+```python
+# 기존 코드 - 공지 공고 제외됨
+if not number or (number.isdigit() == False and number != "공지"):
+    continue  # 공지 공고들이 여기서 제외
+
+# 결과: 페이지당 5개만 수집 (공지 10개 누락)
+```
+
+**수정 후 (해결)**:
+```python
+# 수정된 코드 - 모든 공고 포함
+number = self._process_notice_detection(cells[0], i)
+# 별도 continue 조건 제거
+
+# 결과: 페이지당 15개 모두 수집 (공지 10개 + 번호 5개)
+```
+
+### 10.6 테스트 스크립트 템플릿
+
+```python
+def test_cci_notice_collection(site_code, pages=3):
+    """CCI 사이트 공지 포함 수집 테스트"""
+    # 예: test_cci_notice_collection('yongincci', 3)
+    
+    scraper_class = f"Enhanced{site_code.capitalize()}Scraper"
+    output_dir = f"output/{site_code}_notice_test"
+    
+    # 테스트 실행
+    scraper = globals()[scraper_class]()
+    scraper.scrape_pages(max_pages=pages, output_base=output_dir)
+    
+    # 결과 검증
+    total_announcements = len([f for f in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, f))])
+    expected = pages * 15  # 페이지당 15개 예상
+    
+    print(f"✅ {site_code} 테스트 결과:")
+    print(f"   수집 공고: {total_announcements}개 / 예상: {expected}개")
+    print(f"   성공률: {(total_announcements/expected)*100:.1f}%")
+```
+
+### 10.7 우선순위
+
+1. **높음**: yongincci, changwoncci (많이 사용되는 스크래퍼)
+2. **중간**: jinjucci, tongyeongcci, sacheoncci
+3. **참고**: yangsancci (이미 완료됨 - 참고용)
+
+이 가이드를 따라 모든 CCI 스크래퍼를 수정하면 공지 공고를 포함한 완전한 수집이 가능해집니다.
+
+## 11. Enhanced Base Scraper 수정 시 하위 호환성 보장 원칙
+
+### ⚠️ **극히 중요: 절대 지켜야 할 원칙**
+
+Enhanced Base Scraper(`enhanced_base_scraper.py`)는 **수백 개의 스크래퍼 클래스들이 상속**하고 있습니다. 
+기본 클래스를 수정할 때는 **하위 호환성(Backward Compatibility)**을 반드시 보장해야 합니다.
+
+### 11.1 절대 하지 말아야 할 수정 (❌ 금지)
+
+#### ❌ 메서드 시그니처 변경
+```python
+# 절대 금지 - 기존 자식 클래스들이 모두 오류 발생
+def parse_list_page(self, html_content: str, page_num: int) -> List[Dict]:  # ❌
+def parse_detail_page(self, html_content: str, extra_param: str) -> Dict:   # ❌
+def get_list_url(self, page_num: int, category: str) -> str:                # ❌
+```
+
+#### ❌ 추상 메서드 추가
+```python
+# 절대 금지 - 기존 자식 클래스들에서 구현되지 않아 오류
+@abstractmethod
+def new_required_method(self):  # ❌
+    pass
+```
+
+#### ❌ 필수 속성 추가
+```python
+# 절대 금지 - 기존 자식 클래스들이 속성을 설정하지 않아 오류
+def __init__(self):
+    self.required_new_attribute = None  # ❌ 기존 클래스에서 오류
+```
+
+#### ❌ 기존 메서드 제거
+```python
+# 절대 금지 - 기존 자식 클래스들이 호출하던 메서드 삭제
+# def old_method(self):  # ❌ 삭제하면 모든 자식 클래스 오류
+#     pass
+```
+
+### 11.2 안전한 수정 방법 (✅ 허용)
+
+#### ✅ 새로운 선택적 속성 추가
+```python
+def __init__(self):
+    # 기존 속성들...
+    
+    # 새로운 속성 - 기본값 제공으로 하위 호환성 보장
+    self.new_optional_attribute = None  # ✅ 안전
+    self.current_page_num = 1          # ✅ 안전 (기본값 있음)
+```
+
+#### ✅ 새로운 선택적 메서드 추가
+```python
+def new_optional_method(self, param=None):
+    """새로운 기능 - 선택적 사용"""
+    # 기본 구현 제공
+    return param
+
+def enhanced_feature(self):
+    """향상된 기능 - 기존 클래스는 사용하지 않아도 됨"""
+    if hasattr(self, 'supports_enhanced_feature'):
+        return self.supports_enhanced_feature
+    return False  # 기본값
+```
+
+#### ✅ 기존 메서드 내부 로직 개선
+```python
+def existing_method(self, html_content: str) -> List[Dict]:
+    """기존 메서드 시그니처 유지하면서 내부 로직만 개선"""
+    # 새로운 속성이 있으면 활용, 없으면 기존 방식
+    page_num = getattr(self, 'current_page_num', 1)  # ✅ 안전
+    
+    # 기존 로직 개선
+    return self._enhanced_parsing(html_content, page_num)
+```
+
+#### ✅ 기존 메서드에 기본값 매개변수 추가
+```python
+def existing_method(self, html_content: str, new_param=None):
+    """기본값이 있는 새 매개변수 추가는 안전"""
+    if new_param is None:
+        new_param = "default_value"
+    # 로직 처리...
+```
+
+### 11.3 실제 적용 사례: 페이지네이션 지원
+
+#### ❌ 잘못된 접근 (하위 호환성 파괴)
+```python
+# 이렇게 하면 수백 개 클래스 모두 수정 필요
+@abstractmethod
+def parse_list_page(self, html_content: str, page_num: int):  # ❌
+    pass
+```
+
+#### ✅ 올바른 접근 (하위 호환성 보장)
+```python
+class EnhancedBaseScraper:
+    def __init__(self):
+        # 새로운 속성 추가 (기본값 제공)
+        self.current_page_num = 1  # ✅ 안전
+
+    def _get_page_announcements(self, page_num: int):
+        # 인스턴스 변수에 페이지 번호 저장
+        self.current_page_num = page_num  # ✅ 안전
+        
+        # 기존 시그니처 유지
+        return self.parse_list_page(html_content)  # ✅ 안전
+
+    @abstractmethod
+    def parse_list_page(self, html_content: str):  # ✅ 시그니처 유지
+        pass
+```
+
+#### ✅ 자식 클래스에서 활용
+```python
+class ChildScraper(EnhancedBaseScraper):
+    def parse_list_page(self, html_content: str):
+        # 새로운 속성 안전하게 사용
+        page_num = getattr(self, 'current_page_num', 1)  # ✅ 안전
+        
+        if page_num > 1:
+            # 페이지별 특별 처리
+            pass
+        
+        # 기존 로직...
+```
+
+### 11.4 수정 전 필수 체크리스트
+
+Base Scraper 수정 전에 반드시 확인:
+
+#### ✅ 하위 호환성 체크
+- [ ] 기존 메서드 시그니처가 변경되지 않았는가?
+- [ ] 새로운 필수 매개변수가 추가되지 않았는가?
+- [ ] 새로운 추상 메서드가 추가되지 않았는가?
+- [ ] 기존 메서드가 삭제되지 않았는가?
+- [ ] 새로운 필수 속성이 기본값 없이 추가되지 않았는가?
+
+#### ✅ 기존 스크래퍼 테스트
+```python
+# 수정 후 반드시 기존 스크래퍼 테스트
+def test_backward_compatibility():
+    """기존 스크래퍼들이 여전히 작동하는지 확인"""
+    test_scrapers = ['yongincci', 'changwoncci', 'btp', 'itp']
+    
+    for scraper_name in test_scrapers:
+        try:
+            # 기존 스크래퍼 인스턴스 생성 테스트
+            scraper = create_scraper(scraper_name)
+            scraper.scrape_pages(max_pages=1)
+            print(f"✅ {scraper_name}: 정상 작동")
+        except Exception as e:
+            print(f"❌ {scraper_name}: 오류 발생 - {e}")
+            raise  # 즉시 중단
+```
+
+### 11.5 안전한 Base Scraper 진화 전략
+
+#### 1단계: 새로운 기능을 선택적으로 추가
+```python
+def __init__(self):
+    # 기존 코드...
+    self.supports_new_feature = False  # 기본적으로 비활성화
+```
+
+#### 2단계: 기존 메서드에서 새 기능 지원 감지
+```python
+def existing_method(self, html_content):
+    if getattr(self, 'supports_new_feature', False):
+        return self._new_enhanced_logic(html_content)
+    else:
+        return self._legacy_logic(html_content)  # 기존 방식 유지
+```
+
+#### 3단계: 자식 클래스에서 선택적 활성화
+```python
+class ModernScraper(EnhancedBaseScraper):
+    def __init__(self):
+        super().__init__()
+        self.supports_new_feature = True  # 새 기능 활성화
+```
+
+### 11.6 비상 복구 계획
+
+만약 실수로 하위 호환성을 깨뜨렸다면:
+
+#### 즉시 롤백 절차
+1. **즉시 git revert** 실행
+2. **모든 영향받는 스크래퍼 목록** 작성
+3. **수정 방법 재검토** 후 안전한 방식으로 재구현
+4. **광범위한 테스트** 후 재배포
+
+#### 영향 범위 확인
+```bash
+# Base Scraper를 상속하는 모든 클래스 찾기
+grep -r "EnhancedBaseScraper\|StandardTableScraper" --include="*.py" .
+
+# 영향받는 스크래퍼 개수 확인
+find . -name "*_scraper.py" | wc -l
+```
+
+### 11.7 결론
+
+**Enhanced Base Scraper는 생태계의 핵심**입니다. 
+수백 개의 스크래퍼가 의존하고 있기 때문에 **극도로 신중하게** 수정해야 합니다.
+
+**원칙**: 
+- 🟢 **기능 추가**: 항상 선택적이고 기본값 제공
+- 🔴 **기존 변경**: 절대 금지
+- 🟡 **내부 개선**: 외부 인터페이스 유지하면서만
+
+**기억하세요**: "한 번의 잘못된 Base Scraper 수정이 수백 개 스크래퍼를 망가뜨릴 수 있습니다!"
+
+## 12. 새로운 메모리
 
 - 스크래퍼 개발 시 robots.txt는 무시하고 진행한다.
