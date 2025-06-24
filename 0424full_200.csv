@@ -96,6 +96,11 @@ ywbic,영월군창업보육센터,https://ywbic.kr/ywbic/bbs_list.php?code=sub01
 sehub,서울특별시 사회적경제지원센터,https://sehub.net/archives/category/alarm/opencat
 gsic,경기도사회적경제원,https://gsic.or.kr/home/kor/M837392473/board.do?
 
+
+
+######    상공회의소 부류 먼저 처리함. 아래 날짜 있는 부분까지.
+
+
 korcham,서울상공회의소,https://www.korcham.net/nCham/Service/Kcci/appl/KcciNoticeList.asp
 bcci,부산상공회의소,https://www.bcci.or.kr/kr/index.php?pCode=notice
 dcci,대구상공회의소,https://www.dcci.or.kr/content.html?md=0028
@@ -152,7 +157,7 @@ miryangcci,밀양상공회의소,https://miryangcci.korcham.net/front/board/boar
 
 hamancci,함안상공회의소,https://hamancci.korcham.net/front/board/boardContentsListPage.do?boardId=10521&menuId=10057
 jejucci,제주상공회의소,https://jejucci.korcham.net/front/board/boardContentsListPage.do?boardId=10088&menuId=379
-
+##   06  24   핸폰에서 깨끗하게 처리됨. 샘플로 사용가능할 정도.
 
 
 seoul,서울특별시 농업기술센터,https://agro.seoul.go.kr/archives/category/institution_c1/institution_news_c1/institution_news_gosi-n2

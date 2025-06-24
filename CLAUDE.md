@@ -148,9 +148,79 @@ class NewSiteScraper(BaseScraper):
 
 새로운 사이트를 추가할 때는 위 사이트들 중 가장 유사한 구조를 가진 스크래퍼를 참고하여 구현하면 됩니다.
 
-### 7. 주요 개발 인사이트
+### 7. AJAX 기반 동적 사이트 스크래핑 패턴
 
-#### 7.1 인코딩 처리
+#### 7.1 AJAX API 직접 호출 방식
+많은 최신 사이트들이 JavaScript와 AJAX를 사용해 동적으로 콘텐츠를 로드합니다. 이런 사이트들의 특징과 대응 방법:
+
+**특징 식별 방법**:
+- 페이지 소스보기와 브라우저 렌더링 결과가 다름
+- 빈 `div` 컨테이너들이 존재 (`contents_detail`, `boardlist` 등)
+- 네트워크 탭에서 XHR/Fetch 요청 확인 필요
+
+**해결 패턴**:
+```python
+def _get_page_announcements(self, page_num: int) -> list:
+    """AJAX API를 통한 공고 목록 가져오기"""
+    api_url = f"{self.base_url}/front/board/boardContentsList.do"
+    
+    # AJAX 요청 데이터 구성
+    data = {
+        'miv_pageNo': str(page_num),
+        'miv_pageSize': '15',
+        'boardId': '10521',  # 사이트별 고유값
+        'menuId': '10057',   # 사이트별 고유값
+        'searchKey': 'A',
+        'searchTxt': ''
+    }
+    
+    # POST 요청으로 AJAX API 호출
+    response = self.post_page(api_url, data=data)
+    return self.parse_list_page(response.text)
+```
+
+**적용 사례**: 함안상공회의소, 창원상공회의소 등 한국상공회의소 계열 사이트들
+
+#### 7.2 JavaScript 기반 네비게이션 처리
+상세 페이지 접근이 JavaScript 함수로 구현된 경우:
+
+**패턴 예시**:
+- `onclick="contentsView('114136')"`
+- `onclick="viewDetail('12345')"`
+- `onclick="showBoard(id)"`
+
+**추출 로직**:
+```python
+# JavaScript 함수에서 ID 추출
+id_match = re.search(r"contentsView\('(\d+)'\)", onclick)
+if id_match:
+    content_id = id_match.group(1)
+    detail_url = f"{self.base_url}/front/board/boardContentsView.do?contId={content_id}&boardId=10521&menuId=10057"
+```
+
+#### 7.3 Enhanced Base Scraper 활용 패턴
+AJAX 사이트에서도 Enhanced Base Scraper의 장점을 최대한 활용:
+
+```python
+class EnhancedAjaxScraper(StandardTableScraper):
+    """AJAX 기반 사이트용 Enhanced 스크래퍼"""
+    
+    def _get_page_announcements(self, page_num: int) -> list:
+        """AJAX API 호출로 오버라이드"""
+        # 기본 클래스의 중복 체크, 인코딩 처리 등은 그대로 활용
+        api_response = self.post_page(api_url, data=data)
+        return self.parse_list_page(api_response.text)
+    
+    def parse_list_page(self, html_content: str) -> list:
+        """AJAX 응답 HTML 파싱"""
+        # 나머지는 일반적인 테이블 파싱과 동일
+        soup = BeautifulSoup(html_content, 'html.parser')
+        # ... 테이블 파싱 로직
+```
+
+### 8. 주요 개발 인사이트
+
+#### 8.1 인코딩 처리
 웹 스크래핑 시 인코딩 문제는 매우 흔합니다. 특히 한국 사이트들은 다양한 인코딩을 사용합니다:
 
 1. **페이지 인코딩**:

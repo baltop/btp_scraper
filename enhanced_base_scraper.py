@@ -522,6 +522,13 @@ class EnhancedBaseScraper(ABC):
                 # 새로운 공고만 필터링 및 중복 임계값 체크
                 new_announcements, should_stop = self.filter_new_announcements(announcements)
                 
+                # 각 공고 처리
+                for ann in new_announcements:
+                    announcement_count += 1
+                    processed_count += 1
+                    self.process_announcement(ann, announcement_count, output_base)
+
+
                 # 중복 임계값 도달시 조기 종료
                 if should_stop:
                     logger.info(f"중복 공고 {self.duplicate_threshold}개 연속 발견으로 조기 종료")
@@ -536,11 +543,11 @@ class EnhancedBaseScraper(ABC):
                     stop_reason = "새로운 공고 없음"
                     break
                 
-                # 각 공고 처리
-                for ann in new_announcements:
-                    announcement_count += 1
-                    processed_count += 1
-                    self.process_announcement(ann, announcement_count, output_base)
+                # # 각 공고 처리  --  525줄에 삽입 여긴 원래 자리인대 주석처리.
+                # for ann in new_announcements:
+                #     announcement_count += 1
+                #     processed_count += 1
+                #     self.process_announcement(ann, announcement_count, output_base)
                 
                 # 페이지 간 대기
                 if page_num < max_pages and self.delay_between_pages > 0:
