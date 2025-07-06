@@ -37,6 +37,7 @@ from enhanced_kca_scraper import EnhancedKCAScraper
 from enhanced_smtech_scraper import EnhancedSMTECHScraper
 from enhanced_jepa_scraper import EnhancedJEPAScraper
 from enhanced_kmedihub_scraper import EnhancedKMEDIHUBScraper
+from enhanced_win_scraper import EnhancedWinScraper
 
 # 로깅 설정
 logging.basicConfig(
@@ -146,6 +147,11 @@ ENHANCED_SCRAPERS = {
         'class': EnhancedKMEDIHUBScraper,
         'name': 'KMEDIHUB (한국의료기기안전정보원)',
         'output_dir': 'kmedihub_enhanced'
+    },
+    'win': {
+        'class': EnhancedWinScraper,
+        'name': 'WIN (윈윈사회적경제지원센터)',
+        'output_dir': 'win_enhanced'
     }
 }
 

@@ -90,12 +90,18 @@ scherb,산청한방약초축제,http://www.scherb.or.kr/bbs/board.php?bo_table=s
 blog,서대문청년창업센터,https://blog.naver.com/PostList.naver?blogId=sdm_ysc&categoryNo=38&skinType=&skinId=&from=menu&userSelectMenu=true
 seeot,부천시사회적경제센터,https://seeot.or.kr/alarm/notice/
 seis,사회적기업 포털,https://www.seis.or.kr/home/sub.do?menukey=7187
-seoulshinbo,서울신용보증재단,https://www.seoulshinbo.co.kr/wbase/contents/bbs/list.do?mng_cd=STRY9788
-shcca,시흥시기업인협회,https://www.shcca.com/notice
-ywbic,영월군창업보육센터,https://ywbic.kr/ywbic/bbs_list.php?code=sub01a&keyvalue=sub01
-sehub,서울특별시 사회적경제지원센터,https://sehub.net/archives/category/alarm/opencat
-gsic,경기도사회적경제원,https://gsic.or.kr/home/kor/M837392473/board.do?
 
+###  0701
+seoulshinbo,서울신용보증재단,https://www.seoulshinbo.co.kr/wbase/contents/bbs/list.do?mng_cd=STRY9788
+
+shcca,시흥시기업인협회,https://www.shcca.com/notice
+
+ywbic,영월군창업보육센터,https://ywbic.kr/ywbic/bbs_list.php?code=sub01a&keyvalue=sub01
+
+sehub,서울특별시 사회적경제지원센터,https://sehub.net/archives/category/alarm/opencat
+
+gsic,경기도사회적경제원,https://gsic.or.kr/home/kor/M837392473/board.do?
+###   역으로 아래부터 처리.
 
 
 ######    상공회의소 부류 먼저 처리함. 아래 날짜 있는 부분까지.
